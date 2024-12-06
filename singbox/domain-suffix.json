@@ -4,9 +4,9 @@
     {
       "domain_suffix": [
         "v2rayssr.com",
-        "ipleak.net"
-        "debian.org"
-        "proxmox.com"
+        "ipleak.net",
+        "debian.org",
+        "proxmox.com",
         "browserleaks.com"
       ]
     }
