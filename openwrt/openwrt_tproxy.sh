@@ -8,7 +8,7 @@
 #################################################
 
 # 配置参数
-BACKEND_URL=""  # 转换后端地址
+BACKEND_URL="10.0.0.6:5000"  # 转换后端地址
 SUBSCRIPTION_URL=""  # 订阅地址
 TEMPLATE_URL="https://ghi.aaop.us.kg/https://raw.githubusercontent.com/adwzlad/AAcustom/refs/heads/main/singbox/config_tproxy.json"  # 配置文件（规则模板)
 TPROXY_PORT=7895  # sing-box tproxy 端口，和配置文件（规则模板）里的端口一致！
