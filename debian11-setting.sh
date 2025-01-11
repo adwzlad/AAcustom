@@ -1,35 +1,33 @@
 #!/bin/bash
 
-# 检查是否以 root 权限运行
-if [ "$(id -u)" -ne 0 ]; then
-  echo "请以 root 用户运行此脚本。"
-  exit 1
+# 检查是否以 root 用户运行
+if [[ $EUID -ne 0 ]]; then
+   echo "请以 root 用户运行此脚本。"
+   exit 1
 fi
 
-# 启用 root 用户 SSH 登录和密码认证
-echo "配置 SSH 以允许 root 登录和密码认证..."
+# 修改 SSH 配置
+echo "配置 SSH 设置..."
 sed -i "s/^#\?PermitRootLogin .*/PermitRootLogin yes/" /etc/ssh/sshd_config
 sed -i "s/^#\?PasswordAuthentication .*/PasswordAuthentication yes/" /etc/ssh/sshd_config
+
+# 重启 SSH 服务
+echo "重启 SSH 服务..."
 service ssh restart
-echo "SSH 配置已更新并重启服务。"
 
-# 设置 root 用户密码
-echo "请设置 root 用户密码："
-passwd
+# 提示用户设置 root 密码
+echo "请为 root 用户设置新密码："
+passwd root
 
-# 安装中文语言包
-echo "安装中文语言包..."
-apt update
-apt install -y locales
-sed -i "s/^# zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/" /etc/locale.gen
+# 配置系统语言为简体中文
+echo "配置系统语言为简体中文..."
+sed -i 's/^# zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen
 update-locale LANG=zh_CN.UTF-8
-echo "系统语言已设置为简体中文 (zh_CN.UTF-8)。"
 
 # 设置时区为香港
-echo "设置时区为香港..."
+echo "设置系统时区为香港..."
 timedatectl set-timezone Asia/Hong_Kong
-echo "时区已设置为香港 (Asia/Hong_Kong)。"
 
-# 确认操作完成
-echo "操作已完成，请重新登录验证配置是否生效。"
+# 确认设置完成
+echo "所有设置已完成！请重新登录以应用语言设置。"
