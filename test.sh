@@ -71,22 +71,25 @@ setup_fail2ban() {
         sudo apt update && sudo apt install -y fail2ban
     fi
     
-    if [[ ! -f "$FAIL2BAN_JAIL_FILE" ]]; then
-        echo "创建 Fail2Ban 自定义配置..."
-        sudo bash -c "cat > $FAIL2BAN_JAIL_FILE <<EOF
+    read -p "请输入 SSH 失败尝试的最大次数（默认 3）: " maxretry
+    maxretry=${maxretry:-3}
+    read -p "请输入封禁时间（秒，默认 1200）: " bantime
+    bantime=${bantime:-1200}
+    
+    echo "创建 Fail2Ban 自定义配置..."
+    sudo bash -c "cat > $FAIL2BAN_JAIL_FILE <<EOF
 [sshd]
 enabled = true
 port = ssh
 filter = sshd
 logpath = /var/log/auth.log
-maxretry = 3
-bantime = 1200
+maxretry = $maxretry
+bantime = $bantime
 EOF"
-    fi
     
     sudo systemctl enable fail2ban
     sudo systemctl restart fail2ban
-    echo "Fail2Ban 已启用，SSH 失败登录保护已开启"
+    echo "Fail2Ban 已启用，SSH 失败登录保护已开启，最大尝试次数: $maxretry，封禁时间: $bantime 秒"
 }
 
 # 屏蔽直接访问服务器 IP
