@@ -19,6 +19,8 @@ CLOUDFLARE_IPV6="https://www.cloudflare.com/ips-v6"
 
 # 更新 Cloudflare IP 规则
 update_cloudflare_ips() {
+    # 保存更新前的 UFW 规则状态
+    old_rules=$(sudo ufw status numbered)
     echo "更新 Cloudflare IP 缓存..."
     local ips_v4=$(curl -s $CLOUDFLARE_IPV4)
     local ips_v6=$(curl -s $CLOUDFLARE_IPV6)
@@ -40,9 +42,16 @@ update_cloudflare_ips() {
 
     echo "Cloudflare 规则已更新！"
 
+    # 保存更新后的 UFW 规则状态
+    new_rules=$(sudo ufw status numbered)
+    # 比较更新前后的规则状态，如果有改动则重启 UFW
+    if [ "$old_rules" != "$new_rules" ]; then
+        echo "规则有改动，重启 UFW..."
+        sudo ufw reload
+    fi
+
     # 启用 UFW 并重载规则
     sudo ufw enable
-    sudo ufw reload
 }
 
 # 设置 SSH 保护
@@ -87,7 +96,6 @@ block_direct_access() {
     sudo ufw allow ssh
     update_cloudflare_ips
     echo "已阻止所有非 Cloudflare 的 HTTP 访问，并确保 SSH 可用"
-    sudo ufw reload
 }
 
 # 允许 Cloudflare 访问 80/443 并提示设置定时更新
@@ -104,7 +112,7 @@ immediately_update_cloudflare_ips() {
 
 # 提示设置定时更新任务
 setup_cron_job_prompt() {
-    read -p "是否要设置 Cloudflare IP 每 12 小时定时更新任务？(y/n): " answer
+    read -p "是否要设置 Cloudflare IP 每天凌晨 4 点定时更新任务？(y/n): " answer
     case $answer in
         [Yy]*)
             setup_cron_job
@@ -117,10 +125,10 @@ setup_cron_job_prompt() {
 
 # 定时更新 Cloudflare IP 规则
 setup_cron_job() {
-    cron_job="0 */12 * * * $(realpath $0) update_cloudflare_ips"
+    cron_job="0 4 * * * $(realpath $0) update_cloudflare_ips"
     if ! crontab -l 2>/dev/null | grep -q "$cron_job"; then
         (crontab -l 2>/dev/null | grep -v "update_cloudflare_ips"; echo "$cron_job") | crontab -
-        echo "已添加 Cloudflare IP 定期更新任务 (每 12 小时执行一次)"
+        echo "已添加 Cloudflare IP 定期更新任务 (每天凌晨 4 点执行一次)"
     else
         echo "Cloudflare IP 定期更新任务已存在，无需重复添加"
     fi
