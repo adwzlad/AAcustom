@@ -11,7 +11,7 @@ check_and_install_ufw() {
 }
 
 # 调用检测安装函数
-check_and_install_ufw()
+check_and_install_ufw
 
 # Cloudflare IP 资源地址
 CLOUDFLARE_IPV4="https://www.cloudflare.com/ips-v4"
@@ -90,16 +90,40 @@ block_direct_access() {
     sudo ufw reload
 }
 
-# 允许 Cloudflare 访问 80/443
+# 允许 Cloudflare 访问 80/443 并提示设置定时更新
 allow_cloudflare_ports() {
     update_cloudflare_ips
+    setup_cron_job_prompt
+}
+
+# 立即更新 Cloudflare 规则并提示设置定时更新
+immediately_update_cloudflare_ips() {
+    update_cloudflare_ips
+    setup_cron_job_prompt
+}
+
+# 提示设置定时更新任务
+setup_cron_job_prompt() {
+    read -p "是否要设置 Cloudflare IP 每 12 小时定时更新任务？(y/n): " answer
+    case $answer in
+        [Yy]*)
+            setup_cron_job
+            ;;
+        *)
+            echo "未设置定时更新任务。"
+            ;;
+    esac
 }
 
 # 定时更新 Cloudflare IP 规则
 setup_cron_job() {
     cron_job="0 */12 * * * $(realpath $0) update_cloudflare_ips"
-    (crontab -l 2>/dev/null | grep -v "update_cloudflare_ips"; echo "$cron_job") | crontab -
-    echo "已添加 Cloudflare IP 定期更新任务 (每 12 小时执行一次)"
+    if ! crontab -l 2>/dev/null | grep -q "$cron_job"; then
+        (crontab -l 2>/dev/null | grep -v "update_cloudflare_ips"; echo "$cron_job") | crontab -
+        echo "已添加 Cloudflare IP 定期更新任务 (每 12 小时执行一次)"
+    else
+        echo "Cloudflare IP 定期更新任务已存在，无需重复添加"
+    fi
 }
 
 # 启动或重启 UFW
@@ -129,18 +153,16 @@ while true; do
     echo "2. 屏蔽服务器真实 IP 直接访问（但允许 SSH 和 Cloudflare）"
     echo "3. 允许 Cloudflare 访问 80/443"
     echo "4. 立即更新 Cloudflare 规则"
-    echo "5. 设置定时更新 Cloudflare IP（每 12 小时）"
-    echo "6. 启动或重启 UFW 使规则生效"
-    echo "7. 退出"
+    echo "5. 启动或重启 UFW 使规则生效"
+    echo "6. 退出"
     read -p "请输入选项: " option
     case $option in
         1) setup_ssh_security ;;
         2) block_direct_access ;;
         3) allow_cloudflare_ports ;;
-        4) update_cloudflare_ips ;;
-        5) setup_cron_job ;;
-        6) start_or_restart_ufw ;;
-        7) exit 0 ;;
+        4) immediately_update_cloudflare_ips ;;
+        5) start_or_restart_ufw ;;
+        6) exit 0 ;;
         *) echo "无效选项！" ;;
     esac
 done
