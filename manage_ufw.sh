@@ -175,7 +175,11 @@ while true; do
         3) allow_cloudflare_ports ;;
         4) immediately_update_cloudflare_ips ;;
         5) start_or_restart_ufw ;;
-        6) exit 0 ;;
+        6) 
+            echo "退出脚本，重启 UFW 以确保规则生效..."
+            sudo ufw reload
+            exit 0
+            ;;
         *) echo "无效选项！" ;;
     esac
 done
