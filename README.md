@@ -10,7 +10,7 @@ bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/oracle_ipv6_checker
 
 生成/etc/nginx/cloudflare_ips.conf，并定时每天凌晨 2 点更新
 
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/debian11-cloudflare_ips.sh)
+bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/nginx-cloudflare_ips.sh)
 
 
 生成/usr/local/openresty/nginx/cloudflare_ips.conf，并定时更新
