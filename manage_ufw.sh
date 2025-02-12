@@ -19,11 +19,12 @@ CLOUDFLARE_IPV6="https://www.cloudflare.com/ips-v6"
 
 # 更新 Cloudflare IP 规则
 update_cloudflare_ips() {
-    # 保存更新前的 UFW 规则状态
-    old_rules=$(sudo ufw status numbered)
     echo "更新 Cloudflare IP 缓存..."
     local ips_v4=$(curl -s $CLOUDFLARE_IPV4)
     local ips_v6=$(curl -s $CLOUDFLARE_IPV6)
+
+    # 保存更新前的 UFW 规则状态
+    old_rules=$(sudo ufw status numbered)
 
     echo "清除旧 Cloudflare 规则..."
     sudo ufw status numbered | grep "ALLOW IN" | awk '{print $3}' | while read -r ip; do
@@ -112,10 +113,11 @@ immediately_update_cloudflare_ips() {
 
 # 提示设置定时更新任务
 setup_cron_job_prompt() {
-    read -p "是否要设置 Cloudflare IP 每天凌晨 4 点定时更新任务？(y/n): " answer
+    read -p "是否要设置 Cloudflare IP 定时更新任务？(y/n): " answer
     case $answer in
         [Yy]*)
-            setup_cron_job
+            read -p "请输入定时更新的时间（格式：分钟 小时，例如：0 4 表示凌晨 4 点）: " cron_time
+            setup_cron_job "$cron_time"
             ;;
         *)
             echo "未设置定时更新任务。"
@@ -125,10 +127,13 @@ setup_cron_job_prompt() {
 
 # 定时更新 Cloudflare IP 规则
 setup_cron_job() {
-    cron_job="0 4 * * * $(realpath $0) update_cloudflare_ips"
+    cron_time="$1"
+    cron_job="$cron_time sudo $(realpath $0) update_cloudflare_ips"
+    # 删除旧的与 update_cloudflare_ips 相关的定时任务
+    crontab -l 2>/dev/null | grep -v "update_cloudflare_ips" | crontab -
     if ! crontab -l 2>/dev/null | grep -q "$cron_job"; then
-        (crontab -l 2>/dev/null | grep -v "update_cloudflare_ips"; echo "$cron_job") | crontab -
-        echo "已添加 Cloudflare IP 定期更新任务 (每天凌晨 4 点执行一次)"
+        (crontab -l 2>/dev/null; echo "$cron_job") | crontab -
+        echo "已添加 Cloudflare IP 定期更新任务 (每天 $cron_time 执行一次)"
     else
         echo "Cloudflare IP 定期更新任务已存在，无需重复添加"
     fi
