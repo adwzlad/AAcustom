@@ -9,25 +9,27 @@ update_cloudflare_ips() {
     echo "更新 Cloudflare IP 缓存..."
     local ips_v4=$(curl -s $CLOUDFLARE_IPV4)
     local ips_v6=$(curl -s $CLOUDFLARE_IPV6)
-    
+
     echo "清除旧 Cloudflare 规则..."
-    for ip in $ips_v4; do
-        sudo ufw delete allow from "$ip" > /dev/null 2>&1
+    sudo ufw status numbered | grep "ALLOW IN" | awk '{print $3}' | while read -r ip; do
+        if [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ || $ip =~ ^[0-9a-fA-F:]+$ ]]; then
+            sudo ufw delete allow from "$ip" > /dev/null 2>&1
+        fi
     done
-    for ip in $ips_v6; do
-        sudo ufw delete allow from "$ip" > /dev/null 2>&1
-    done
-    
+
     echo "添加最新 Cloudflare 规则..."
     for ip in $ips_v4; do
-        sudo ufw allow from "$ip" to any port 80 proto tcp
-        sudo ufw allow from "$ip" to any port 443 proto tcp
+        sudo ufw allow from "$ip" to any port 80,443 proto tcp
     done
     for ip in $ips_v6; do
-        sudo ufw allow from "$ip" to any port 80 proto tcp
-        sudo ufw allow from "$ip" to any port 443 proto tcp
+        sudo ufw allow from "$ip" to any port 80,443 proto tcp
     done
+
     echo "Cloudflare 规则已更新！"
+
+    # 启用 UFW 并重载规则
+    sudo ufw enable
+    sudo ufw reload
 }
 
 # 设置 SSH 保护
@@ -40,6 +42,7 @@ setup_ssh_security() {
             read -p "请输入新的 SSH 端口: " ssh_port
             sudo ufw allow "$ssh_port"/tcp
             echo "SSH 端口已修改为 $ssh_port"
+            sudo ufw reload
             ;;
         2)
             if ! command -v fail2ban-client &> /dev/null; then
@@ -64,13 +67,14 @@ EOL
     esac
 }
 
-# 屏蔽真实 IP 访问
+# 屏蔽真实 IP 访问（仅允许 Cloudflare & SSH）
 block_direct_access() {
     echo "设置 UFW 规则，确保 SSH 访问..."
     sudo ufw default deny incoming
     sudo ufw allow ssh
     update_cloudflare_ips
     echo "已阻止所有非 Cloudflare 的 HTTP 访问，并确保 SSH 可用"
+    sudo ufw reload
 }
 
 # 允许 Cloudflare 访问 80/443
@@ -80,7 +84,8 @@ allow_cloudflare_ports() {
 
 # 定时更新 Cloudflare IP 规则
 setup_cron_job() {
-    (crontab -l 2>/dev/null | grep -v "update_cloudflare_ips"; echo "0 */12 * * * $(realpath $0) update_cloudflare_ips") | crontab -
+    cron_job="0 */12 * * * $(realpath $0) update_cloudflare_ips"
+    (crontab -l 2>/dev/null | grep -v "update_cloudflare_ips"; echo "$cron_job") | crontab -
     echo "已添加 Cloudflare IP 定期更新任务 (每 12 小时执行一次)"
 }
 
