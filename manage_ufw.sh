@@ -89,6 +89,24 @@ setup_cron_job() {
     echo "已添加 Cloudflare IP 定期更新任务 (每 12 小时执行一次)"
 }
 
+# 启动或重启 UFW
+start_or_restart_ufw() {
+    read -p "选择操作 (1: 启动 UFW, 2: 重启 UFW): " action
+    case $action in
+        1)
+            sudo ufw enable
+            echo "UFW 已启动"
+            ;;
+        2)
+            sudo ufw reload
+            echo "UFW 已重启"
+            ;;
+        *)
+            echo "无效选项！"
+            ;;
+    esac
+}
+
 # 主菜单
 while true; do
     echo "======================="
@@ -99,7 +117,8 @@ while true; do
     echo "3. 允许 Cloudflare 访问 80/443"
     echo "4. 立即更新 Cloudflare 规则"
     echo "5. 设置定时更新 Cloudflare IP（每 12 小时）"
-    echo "6. 退出"
+    echo "6. 启动或重启 UFW 使规则生效"
+    echo "7. 退出"
     read -p "请输入选项: " option
     case $option in
         1) setup_ssh_security ;;
@@ -107,7 +126,8 @@ while true; do
         3) allow_cloudflare_ports ;;
         4) update_cloudflare_ips ;;
         5) setup_cron_job ;;
-        6) exit 0 ;;
+        6) start_or_restart_ufw ;;
+        7) exit 0 ;;
         *) echo "无效选项！" ;;
     esac
 done
