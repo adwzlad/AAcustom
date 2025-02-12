@@ -1,5 +1,18 @@
 #!/bin/bash
 
+# 检测 UFW 是否安装，未安装则自动安装
+check_and_install_ufw() {
+    if ! command -v ufw &> /dev/null; then
+        echo "UFW 未安装，正在安装..."
+        sudo apt update
+        sudo apt install -y ufw
+        echo "UFW 安装完成"
+    fi
+}
+
+# 调用检测安装函数
+check_and_install_ufw()
+
 # Cloudflare IP 资源地址
 CLOUDFLARE_IPV4="https://www.cloudflare.com/ips-v4"
 CLOUDFLARE_IPV6="https://www.cloudflare.com/ips-v6"
