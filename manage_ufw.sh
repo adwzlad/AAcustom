@@ -1,5 +1,8 @@
 #!/bin/bash
 
+CONFIG_FILE="/etc/nginx/cloudflare_ips.conf"
+UFW_SCRIPT="/usr/local/bin/update_ufw_rules.sh"
+
 # 检测 UFW 是否安装，未安装则自动安装
 check_and_install_ufw() {
     if ! command -v ufw &> /dev/null; then
@@ -10,21 +13,17 @@ check_and_install_ufw() {
     fi
 }
 
-# 调用检测安装函数
-check_and_install_ufw
-
-# Cloudflare IP 资源地址
-CLOUDFLARE_IPV4="https://www.cloudflare.com/ips-v4"
-CLOUDFLARE_IPV6="https://www.cloudflare.com/ips-v6"
-
-# 更新 Cloudflare IP 规则
+# 直接从 cloudflare_ips.conf 提取 IP 更新 UFW，避免重复下载
 update_cloudflare_ips() {
-    echo "更新 Cloudflare IP 缓存..."
-    local ips_v4=$(curl -s $CLOUDFLARE_IPV4)
-    local ips_v6=$(curl -s $CLOUDFLARE_IPV6)
-
-    # 保存更新前的 UFW 规则状态
-    old_rules=$(sudo ufw status numbered)
+    if [ -f "$CONFIG_FILE" ]; then
+        echo "从 cloudflare_ips.conf 加载 Cloudflare IP..."
+        IP_LIST=$(grep -oP '(?<=set_real_ip_from )[\d./:]+' "$CONFIG_FILE")
+    else
+        echo "cloudflare_ips.conf 未找到，直接从 Cloudflare 获取最新 IP..."
+        CLOUDFLARE_IPV4="https://www.cloudflare.com/ips-v4"
+        CLOUDFLARE_IPV6="https://www.cloudflare.com/ips-v6"
+        IP_LIST=$(curl -s $CLOUDFLARE_IPV4; curl -s $CLOUDFLARE_IPV6)
+    fi
 
     echo "清除旧 Cloudflare 规则..."
     sudo ufw status numbered | grep "ALLOW IN" | awk '{print $3}' | while read -r ip; do
@@ -34,37 +33,24 @@ update_cloudflare_ips() {
     done
 
     echo "添加最新 Cloudflare 规则..."
-    for ip in $ips_v4; do
-        sudo ufw allow from "$ip" to any port 80,443 proto tcp
-    done
-    for ip in $ips_v6; do
+    for ip in $IP_LIST; do
         sudo ufw allow from "$ip" to any port 80,443 proto tcp
     done
 
     echo "Cloudflare 规则已更新！"
-
-    # 保存更新后的 UFW 规则状态
-    new_rules=$(sudo ufw status numbered)
-    # 比较更新前后的规则状态，如果有改动则重启 UFW
-    if [ "$old_rules" != "$new_rules" ]; then
-        echo "规则有改动，重启 UFW..."
-        sudo ufw reload
-    fi
-
-    # 启用 UFW 并重载规则
-    sudo ufw enable
+    sudo ufw reload
 }
 
-# 设置 SSH 保护
+# 配置 SSH 端口保护
 setup_ssh_security() {
-    echo "1) 配置 SSH 端口"
-    echo "2) 限制 SSH 登录失败次数 (Fail2Ban)"
+    echo "1) 设置 SSH 端口"
+    echo "2) 启用 Fail2Ban 保护 SSH"
     read -p "请选择: " choice
     case $choice in
         1)
             read -p "请输入新的 SSH 端口: " ssh_port
             sudo ufw allow "$ssh_port"/tcp
-            echo "SSH 端口已修改为 $ssh_port"
+            echo "SSH 端口已开放：$ssh_port"
             sudo ufw reload
             ;;
         2)
@@ -73,8 +59,8 @@ setup_ssh_security() {
                 sudo apt update && sudo apt install -y fail2ban
                 sudo systemctl enable --now fail2ban
             fi
-            read -p "请输入最大重试次数 (默认: 3): " maxretry
-            read -p "请输入封禁时间 (秒，默认: 1200): " bantime
+            read -p "最大失败次数 (默认: 3): " maxretry
+            read -p "封禁时间 (秒, 默认: 1200): " bantime
             maxretry=${maxretry:-3}
             bantime=${bantime:-1200}
             sudo bash -c "cat > /etc/fail2ban/jail.local" <<EOL
@@ -84,25 +70,19 @@ maxretry = $maxretry
 bantime = $bantime
 EOL
             sudo systemctl restart fail2ban
-            echo "Fail2Ban 已启用，SSH 失败登录保护已开启 (maxretry: $maxretry, bantime: $bantime 秒)"
+            echo "Fail2Ban 已启用 (maxretry: $maxretry, bantime: $bantime 秒)"
             ;;
         *) echo "无效选项！" ;;
     esac
 }
 
-# 屏蔽真实 IP 访问（仅允许 Cloudflare & SSH）
+# 只允许 Cloudflare IP 访问 80/443
 block_direct_access() {
-    echo "设置 UFW 规则，确保 SSH 访问..."
+    echo "阻止非 Cloudflare 访问..."
     sudo ufw default deny incoming
     sudo ufw allow ssh
     update_cloudflare_ips
-    echo "已阻止所有非 Cloudflare 的 HTTP 访问，并确保 SSH 可用"
-}
-
-# 允许 Cloudflare 访问 80/443 并提示设置定时更新
-allow_cloudflare_ports() {
-    update_cloudflare_ips
-    setup_cron_job_prompt
+    echo "已阻止所有非 Cloudflare HTTP 访问，并确保 SSH 可用"
 }
 
 # 立即更新 Cloudflare 规则并提示设置定时更新
@@ -111,31 +91,32 @@ immediately_update_cloudflare_ips() {
     setup_cron_job_prompt
 }
 
-# 提示设置定时更新任务
+# 提示是否要设置定时更新任务
 setup_cron_job_prompt() {
-    read -p "是否要设置 Cloudflare IP 定时更新任务？(y/n): " answer
+    read -p "是否设置 Cloudflare IP 定时更新任务？(y/n): " answer
     case $answer in
         [Yy]*)
-            read -p "请输入定时更新的时间（格式：分钟 小时，例如：0 4 表示凌晨 4 点）: " cron_time
+            read -p "请输入定时更新时间（格式：分钟 小时，例如 0 4 表示凌晨 4 点）: " cron_time
             setup_cron_job "$cron_time"
             ;;
-        *)
-            echo "未设置定时更新任务。"
-            ;;
+        *) echo "未设置定时任务。" ;;
     esac
 }
 
 # 定时更新 Cloudflare IP 规则
 setup_cron_job() {
     cron_time="$1"
-    cron_job="$cron_time sudo $(realpath $0) update_cloudflare_ips"
-    # 删除旧的与 update_cloudflare_ips 相关的定时任务
-    crontab -l 2>/dev/null | grep -v "update_cloudflare_ips" | crontab -
-    if ! crontab -l 2>/dev/null | grep -q "$cron_job"; then
+    cron_job="$cron_time root $UFW_SCRIPT"
+    echo "#!/bin/bash" > "$UFW_SCRIPT"
+    echo "update_cloudflare_ips" >> "$UFW_SCRIPT"
+    chmod +x "$UFW_SCRIPT"
+
+    crontab -l 2>/dev/null | grep -v "$UFW_SCRIPT" | crontab -
+    if ! crontab -l 2>/dev/null | grep -q "$UFW_SCRIPT"; then
         (crontab -l 2>/dev/null; echo "$cron_job") | crontab -
-        echo "已添加 Cloudflare IP 定期更新任务 (每天 $cron_time 执行一次)"
+        echo "已添加 Cloudflare IP 定期更新任务，每天 $cron_time 执行一次"
     else
-        echo "Cloudflare IP 定期更新任务已存在，无需重复添加"
+        echo "定时任务已存在"
     fi
 }
 
@@ -143,17 +124,9 @@ setup_cron_job() {
 start_or_restart_ufw() {
     read -p "选择操作 (1: 启动 UFW, 2: 重启 UFW): " action
     case $action in
-        1)
-            sudo ufw enable
-            echo "UFW 已启动"
-            ;;
-        2)
-            sudo ufw reload
-            echo "UFW 已重启"
-            ;;
-        *)
-            echo "无效选项！"
-            ;;
+        1) sudo ufw enable; echo "UFW 已启动" ;;
+        2) sudo ufw reload; echo "UFW 已重启" ;;
+        *) echo "无效选项！" ;;
     esac
 }
 
@@ -163,7 +136,7 @@ while true; do
     echo " UFW 防火墙管理菜单 "
     echo "======================="
     echo "1. 配置 SSH 安全性"
-    echo "2. 屏蔽服务器真实 IP 直接访问（但允许 SSH 和 Cloudflare）"
+    echo "2. 屏蔽服务器真实 IP 直接访问（仅允许 Cloudflare & SSH）"
     echo "3. 允许 Cloudflare 访问 80/443"
     echo "4. 立即更新 Cloudflare 规则"
     echo "5. 启动或重启 UFW 使规则生效"
@@ -172,14 +145,10 @@ while true; do
     case $option in
         1) setup_ssh_security ;;
         2) block_direct_access ;;
-        3) allow_cloudflare_ports ;;
-        4) immediately_update_cloudflare_ips ;;
+        3) immediately_update_cloudflare_ips ;;
+        4) update_cloudflare_ips ;;
         5) start_or_restart_ufw ;;
-        6) 
-            echo "退出脚本，重启 UFW 以确保规则生效..."
-            sudo ufw reload
-            exit 0
-            ;;
+        6) echo "退出，重启 UFW 以确保规则生效..."; sudo ufw reload; exit 0 ;;
         *) echo "无效选项！" ;;
     esac
 done
