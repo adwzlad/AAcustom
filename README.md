@@ -45,3 +45,9 @@ Openwrt删除相关防火墙规则，并停止运行sing-box
 bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/stop_singbox_tun.sh)
 
 bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/stop_singbox_tun.sh)
+
+如何安装 bash（如果未安装），如果 which bash 或 command -v bash 有输出，说明 bash 已安装
+
+opkg update
+
+opkg install bash
