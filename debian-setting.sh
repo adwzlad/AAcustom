@@ -32,7 +32,7 @@ enable_root_ssh_login() {
     echo -e "${GREEN}已启用 root 用户 SSH 登录。${RESET}"
 }
 
-# 开启 root 密码登录
+# 开启密码登录
 enable_password_auth() {
     sed -i "s/^#\?PasswordAuthentication .*/PasswordAuthentication yes/" /etc/ssh/sshd_config
     echo -e "${GREEN}已启用 SSH 密码验证。${RESET}"
@@ -66,13 +66,13 @@ set_locale() {
 
     apt-get update -qq
     apt-get install -y locales
-    sed -i "s/^# $locale/$locale/" /etc/locale.gen
+    sed -i "s/^# *$locale/$locale/" /etc/locale.gen
     echo "LANG=$locale" > /etc/default/locale
     locale-gen
     echo -e "${GREEN}语言设置为 $locale。${RESET}"
 }
 
-# 设置时区
+# 设置时区（含自动获取和容错）
 set_timezone() {
     echo "选择时区："
     echo "1) 香港 (Asia/Hong_Kong)"
@@ -88,8 +88,18 @@ set_timezone() {
         3) timezone="Asia/Singapore" ;;
         4) timezone="Asia/Tokyo" ;;
         5)
-            apt-get install -y curl
-            timezone=$(curl -s http://worldtimeapi.org/api/ip | grep -oP '(?<="timezone":")[^"]+')
+            echo -e "${YELLOW}尝试从 ipapi.co 获取时区...${RESET}"
+            timezone=$(curl -s --max-time 5 https://ipapi.co/timezone)
+
+            if [[ -z "$timezone" || "$timezone" == "null" ]]; then
+                echo -e "${YELLOW}ipapi.co 获取失败，尝试备用 API ipinfo.io...${RESET}"
+                timezone=$(curl -s --max-time 5 https://ipinfo.io/timezone)
+            fi
+
+            if [[ -z "$timezone" || "$timezone" == "null" ]]; then
+                echo -e "${RED}自动获取时区失败，请手动选择其他选项。${RESET}"
+                return
+            fi
             ;;
         *) echo -e "${RED}无效选项。${RESET}"; return ;;
     esac
@@ -98,7 +108,7 @@ set_timezone() {
         timedatectl set-timezone "$timezone"
         echo -e "${GREEN}时区设置为 $timezone。${RESET}"
     else
-        echo -e "${RED}无法获取时区信息。${RESET}"
+        echo -e "${RED}无法设置时区。${RESET}"
     fi
 }
 
