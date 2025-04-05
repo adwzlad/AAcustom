@@ -1,8 +1,8 @@
-更换系统语言、修改时区/密码
+更换系统语言、修改时区/密码/SSH
 
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/debian11-setting.sh)
+bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/debian-setting.sh)
 
-bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/debian11-setting.sh)
+bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/debian-setting.sh)
 
 Oracle自动获取IPV6
 
