@@ -27,14 +27,13 @@ echo "$NIC_INFOS" | while read -r IFACE IPADDR; do
   IP=$(echo $IPADDR | cut -d/ -f1)
   PREFIX=$(echo $IPADDR | cut -d/ -f2)
   SUBNET=$(ipcalc -n $IP/$PREFIX | grep Network | awk '{print $2}')
-  
-  # 提取网关，优先使用 ip route 输出
+
   GATEWAY=$(ip route | grep "^default.*dev $IFACE" | awk '{print $3}')
   [ -z "$GATEWAY" ] && GATEWAY=$(echo $SUBNET | sed 's|0/.*|1|')
 
   TABLE_NAME="rt_$IFACE"
-  ip route add $SUBNET dev $IFACE src $IP table $TABLE_NAME || true
-  ip route add default via $GATEWAY dev $IFACE table $TABLE_NAME || true
+  ip route replace $SUBNET dev $IFACE src $IP table $TABLE_NAME || true
+  ip route replace default via $GATEWAY dev $IFACE table $TABLE_NAME || true
 
   ip rule | grep -q "from $IP/32 table $TABLE_NAME" || \
     ip rule add from $IP/32 table $TABLE_NAME priority 1000
