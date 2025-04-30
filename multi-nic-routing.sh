@@ -27,15 +27,21 @@ echo "$NIC_INFOS" | while read -r IFACE IPADDR; do
   IP=$(echo $IPADDR | cut -d/ -f1)
   PREFIX=$(echo $IPADDR | cut -d/ -f2)
   SUBNET=$(ipcalc -n $IP/$PREFIX | grep Network | awk '{print $2}')
-  GATEWAY=$(ip route show dev $IFACE | grep default | awk '{print $3}')
+  
+  # 提取网关，优先使用 ip route 输出
+  GATEWAY=$(ip route | grep "^default.*dev $IFACE" | awk '{print $3}')
   [ -z "$GATEWAY" ] && GATEWAY=$(echo $SUBNET | sed 's|0/.*|1|')
 
   TABLE_NAME="rt_$IFACE"
   ip route add $SUBNET dev $IFACE src $IP table $TABLE_NAME || true
   ip route add default via $GATEWAY dev $IFACE table $TABLE_NAME || true
-  ip rule add from $IP/32 table $TABLE_NAME priority 1000 || true
+
+  ip rule | grep -q "from $IP/32 table $TABLE_NAME" || \
+    ip rule add from $IP/32 table $TABLE_NAME priority 1000
+
   sysctl -w net.ipv4.conf.$IFACE.rp_filter=0 > /dev/null
 done
+
 sysctl -w net.ipv4.conf.all.rp_filter=0 > /dev/null
 
 echo "🧪 验证配置："
@@ -55,8 +61,9 @@ echo -e "\n🌐 Ping 测试："
 echo "$NIC_INFOS" | while read -r IFACE IPADDR; do
   IP=$(echo $IPADDR | cut -d/ -f1)
   echo -n "📡 $IFACE ($IP)："
-  ping -c 1 -W 2 -I $IP 8.8.8.8 &>/dev/null && echo "✅ 通！" || echo "❌ 不通！"
+  ping -c 1 -W 2 -I $IP 8.8.8.8 &>/dev/null && echo "✅ 通！" || echo "❌ 不通！" &
 done
+wait
 EOF
 
 chmod +x "$ROUTE_SCRIPT"
