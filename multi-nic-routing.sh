@@ -13,56 +13,38 @@ cat > "$ROUTE_SCRIPT" <<'EOF'
 set -e
 
 echo "🧹 清除旧的规则和路由表..."
-ip rule | grep 'from 10\.' | while read -r line; do
-  PRIO=$(echo $line | awk '{print $1}')
-  ip rule del prio $PRIO || true
+ip rule | grep -E 'from 10\.' | while read -r line; do
+  PRIO=$(echo "$line" | awk '{print $1}' | tr -d ':')
+  [[ "$PRIO" =~ ^[0-9]+$ ]] && ip rule del prio "$PRIO" || true
 done
 
-for TABLE in $(grep '^1[0-9][0-9] rt_' /etc/iproute2/rt_tables | awk '{print $2}'); do
-  ip route flush table $TABLE || true
+for TABLE in $(grep -E '^1[0-9][0-9] rt_' /etc/iproute2/rt_tables | awk '{print $2}'); do
+  ip route flush table "$TABLE" || true
 done
 
 NIC_INFOS=$(ip -o -4 addr show | grep '10\.' | awk '{print $2, $4}')
-echo "$NIC_INFOS" | while read -r IFACE IPADDR; do
-  IP=$(echo $IPADDR | cut -d/ -f1)
-  PREFIX=$(echo $IPADDR | cut -d/ -f2)
-  SUBNET=$(ipcalc -n $IP/$PREFIX | grep Network | awk '{print $2}')
+TABLE_INDEX=1000
 
+echo "$NIC_INFOS" | while read -r IFACE IPADDR; do
+  IP=$(echo "$IPADDR" | cut -d/ -f1)
+  SUBNET=$(ip route | grep "$IFACE" | grep -v 'default' | awk '{print $1}' | head -n1)
   GATEWAY=$(ip route | grep "^default.*dev $IFACE" | awk '{print $3}')
-  [ -z "$GATEWAY" ] && GATEWAY=$(echo $SUBNET | sed 's|0/.*|1|')
+  [ -z "$GATEWAY" ] && GATEWAY="${SUBNET%.*}.1"
 
   TABLE_NAME="rt_$IFACE"
-  ip route replace $SUBNET dev $IFACE src $IP table $TABLE_NAME || true
-  ip route replace default via $GATEWAY dev $IFACE table $TABLE_NAME || true
+  ip route replace "$SUBNET" dev "$IFACE" src "$IP" table "$TABLE_NAME" || true
+  ip route replace default via "$GATEWAY" dev "$IFACE" table "$TABLE_NAME" || true
 
-  ip rule | grep -q "from $IP/32 table $TABLE_NAME" || \
-    ip rule add from $IP/32 table $TABLE_NAME priority 1000
+  ip rule add from "$IP/32" table "$TABLE_NAME" priority "$TABLE_INDEX" || true
+  sysctl -w "net.ipv4.conf.$IFACE.rp_filter=0" > /dev/null
 
-  sysctl -w net.ipv4.conf.$IFACE.rp_filter=0 > /dev/null
+  ((TABLE_INDEX++))
 done
 
 sysctl -w net.ipv4.conf.all.rp_filter=0 > /dev/null
 
-echo "🧪 验证配置："
-echo -e "\n🔍 当前策略路由规则："
-ip rule | grep 'from 10\.' || echo "⚠️ 无策略路由规则"
+echo "✅ 策略路由配置完成！"
 
-echo -e "\n📜 当前路由表定义："
-grep '^1[0-9][0-9] rt_' /etc/iproute2/rt_tables
-
-echo -e "\n📤 路由表内容："
-for TABLE in $(grep '^1[0-9][0-9] rt_' /etc/iproute2/rt_tables | awk '{print $2}'); do
-  echo -e "\n🧭 表 $TABLE:"
-  ip route show table $TABLE
-done
-
-echo -e "\n🌐 Ping 测试："
-echo "$NIC_INFOS" | while read -r IFACE IPADDR; do
-  IP=$(echo $IPADDR | cut -d/ -f1)
-  echo -n "📡 $IFACE ($IP)："
-  ping -c 1 -W 2 -I $IP 8.8.8.8 &>/dev/null && echo "✅ 通！" || echo "❌ 不通！" &
-done
-wait
 EOF
 
 chmod +x "$ROUTE_SCRIPT"
@@ -70,11 +52,10 @@ chmod +x "$ROUTE_SCRIPT"
 echo "🔁 更新 /etc/iproute2/rt_tables..."
 sed -i '/^1[0-9][0-9] rt_/d' "$RT_TABLES_FILE"
 TABLE_INDEX=100
-NIC_INFOS=$(ip -o -4 addr show | grep '10\.' | awk '{print $2, $4}')
-while read -r IFACE IPADDR; do
+while read -r IFACE _; do
   echo "$TABLE_INDEX rt_$IFACE" >> "$RT_TABLES_FILE"
   ((TABLE_INDEX++))
-done <<< "$NIC_INFOS"
+done <<< "$(ip -o -4 addr show | grep '10\.' | awk '{print $2, $4}')"
 
 echo "🧩 写入 systemd 服务..."
 cat > "$SYSTEMD_PATH" <<EOF
