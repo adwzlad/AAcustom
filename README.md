@@ -1,8 +1,8 @@
 Debian/Ubuntu 一键部署 Google Cloud 多网卡策略路由配置脚本
 
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/setup-multi-nic-routing.sh)
+bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/multi-nic-routing.sh)
 
-bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/setup-multi-nic-routing.sh)
+bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/multi-nic-routing.sh)
 
 适用于从 Debian 11 升级到 Debian 12 的一键 .sh 脚本
 
