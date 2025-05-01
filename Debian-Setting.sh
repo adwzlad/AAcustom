@@ -1,20 +1,21 @@
 #!/bin/bash
 set -e
 
-# 检查是否为 root 用户运行
+# 检查是否为 root 用户
 if [[ $EUID -ne 0 ]]; then
   echo "请以 root 权限运行此脚本（使用 sudo）"
   exit 1
 fi
 
-function check_command() {
+# 检查命令存在
+check_command() {
   command -v "$1" >/dev/null 2>&1
 }
 
-function install_package() {
+# 自动安装依赖包
+install_package() {
   local pkg=$1
-  echo "尝试安装缺失组件：$pkg..."
-
+  echo "安装依赖项：$pkg..."
   if check_command apt; then
     apt update && apt install -y "$pkg"
   elif check_command dnf; then
@@ -27,30 +28,20 @@ function install_package() {
   fi
 }
 
-function ensure_dependencies() {
+# 确保必要依赖存在
+ensure_dependencies() {
   echo "检查并安装依赖..."
 
-  if ! check_command locale-gen && ! check_command localedef; then
-    echo "缺少 locale 工具，尝试安装..."
-    install_package locales || install_package glibc-common || install_package glibc-langpack-en
-  fi
-
-  if ! check_command timedatectl; then
-    install_package systemd
-  fi
-
-  if ! check_command curl; then
-    install_package curl
-  fi
-
-  if ! check_command passwd; then
-    install_package passwd
-  fi
+  ! check_command locale-gen && ! check_command localedef && install_package locales
+  ! check_command timedatectl && install_package systemd
+  ! check_command curl && install_package curl
+  ! check_command passwd && install_package passwd
 
   echo "依赖检查完成"
 }
 
-function change_locale() {
+# 设置系统语言
+change_locale() {
   echo "选择系统语言:"
   echo "1) 英语 (en_US.UTF-8)"
   echo "2) 简体中文 (zh_CN.UTF-8)"
@@ -66,23 +57,31 @@ function change_locale() {
 
   echo "设置语言为 $locale..."
 
-  if check_command locale-gen; then
-    sed -i "s/^LANG=.*/LANG=$locale/" /etc/default/locale || echo "LANG=$locale" > /etc/default/locale
-    locale-gen "$locale"
-    update-locale LANG="$locale"
-  elif check_command localedef; then
-    if [ -d "/usr/share/i18n/charmaps" ]; then
-      localedef -v -c -i "${locale%%.*}" -f UTF-8 "$locale" || true
+  if check_command apt; then
+    install_package locales
+    grep -q "^${locale}" /etc/locale.gen || echo "${locale} UTF-8" >> /etc/locale.gen
+    locale-gen
+    update-locale LANG=$locale
+    echo "LANG=$locale" > /etc/default/locale
+  elif check_command dnf || check_command yum; then
+    pkgname="glibc-langpack-${locale%%_*}"
+    install_package "$pkgname"
+    if [ -d "/usr/share/i18n/locales" ] && [ -d "/usr/share/i18n/charmaps" ]; then
+      localedef -c -i "${locale%%.*}" -f UTF-8 "$locale" || true
     else
-      echo "[警告] 缺少字符集定义，跳过 localedef"
+      echo "[警告] 缺少 i18n 路径，跳过 localedef"
     fi
     echo "LANG=$locale" | tee /etc/locale.conf >/dev/null
+  else
+    echo "[错误] 无法识别系统环境，请手动配置 locale"
+    return
   fi
 
-  echo "语言修改完成"
+  echo "语言设置完成为 $locale"
 }
 
-function change_timezone() {
+# 设置系统时区
+change_timezone() {
   echo "选择时区:"
   echo "1) 台北"
   echo "2) 香港"
@@ -97,19 +96,20 @@ function change_timezone() {
     4)
       if check_command curl; then
         timezone=$(curl -s https://ipapi.co/timezone)
-        echo "检测到的时区为 $timezone"
+        echo "自动检测到时区：$timezone"
       else
-        echo "无法使用 curl 自动检测，请手动安装 curl 或选择其他选项"; return
+        echo "无法使用 curl 自动检测，请先安装 curl"; return
       fi
       ;;
     *) echo "无效选择"; return ;;
   esac
 
   timedatectl set-timezone "$timezone"
-  echo "时区已设置为 $timezone"
+  echo "已设置时区为 $timezone"
 }
 
-function change_ssh_password() {
+# 修改 SSH 密码
+change_ssh_password() {
   read -p "请输入要修改密码的用户名: " username
   if id "$username" &>/dev/null; then
     passwd "$username"
@@ -119,7 +119,8 @@ function change_ssh_password() {
   fi
 }
 
-function enable_root_login() {
+# 启用 root 登录
+enable_root_login() {
   echo "启用 root 密码登录..."
   passwd root
   sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin yes/' /etc/ssh/sshd_config
@@ -127,7 +128,8 @@ function enable_root_login() {
   echo "已启用 root 密码登录并重启 SSH 服务"
 }
 
-function main_menu() {
+# 主菜单
+main_menu() {
   ensure_dependencies
 
   while true; do
