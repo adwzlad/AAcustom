@@ -122,10 +122,14 @@ change_ssh_password() {
 # 启用 root 登录
 enable_root_login() {
   echo "启用 root 密码登录..."
+
   passwd root
-  sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin yes/' /etc/ssh/sshd_config
+
+  sed -i "s/^#\?PermitRootLogin .*/PermitRootLogin yes/" /etc/ssh/sshd_config
+  sed -i "s/^#\?PasswordAuthentication .*/PasswordAuthentication yes/" /etc/ssh/sshd_config
+
   systemctl restart ssh
-  echo "已启用 root 密码登录并重启 SSH 服务"
+  echo "已启用 root 密码登录和密码认证，并重启了 SSH 服务"
 }
 
 # 修改 SSH 端口
@@ -136,10 +140,7 @@ change_ssh_port() {
     return
   fi
 
-  # 修改 SSH 配置文件
   sed -i "s/^#\?Port .*/Port $ssh_port/" /etc/ssh/sshd_config
-
-  # 重启 SSH 服务
   systemctl restart ssh
   echo "SSH 端口已修改为 $ssh_port 并重启了 SSH 服务"
 }
