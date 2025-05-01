@@ -128,6 +128,22 @@ enable_root_login() {
   echo "已启用 root 密码登录并重启 SSH 服务"
 }
 
+# 修改 SSH 端口
+change_ssh_port() {
+  read -p "请输入新的 SSH 端口号: " ssh_port
+  if [[ ! "$ssh_port" =~ ^[0-9]+$ ]] || [ "$ssh_port" -lt 1024 ] || [ "$ssh_port" -gt 65535 ]; then
+    echo "无效的端口号，请输入 1024 到 65535 之间的数字"
+    return
+  fi
+
+  # 修改 SSH 配置文件
+  sed -i "s/^#\?Port .*/Port $ssh_port/" /etc/ssh/sshd_config
+
+  # 重启 SSH 服务
+  systemctl restart ssh
+  echo "SSH 端口已修改为 $ssh_port 并重启了 SSH 服务"
+}
+
 # 主菜单
 main_menu() {
   ensure_dependencies
@@ -139,14 +155,16 @@ main_menu() {
     echo "2) 修改系统时区"
     echo "3) 修改指定账户SSH密码"
     echo "4) 启用ROOT密码登录"
+    echo "5) 修改SSH端口"
     echo "0) 退出"
-    read -p "请选择操作 [0-4]: " opt
+    read -p "请选择操作 [0-5]: " opt
 
     case $opt in
       1) change_locale ;;
       2) change_timezone ;;
       3) change_ssh_password ;;
       4) enable_root_login ;;
+      5) change_ssh_port ;;
       0) echo "退出脚本"; break ;;
       *) echo "无效选项" ;;
     esac
