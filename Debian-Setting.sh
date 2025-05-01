@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# 检查是否为 root 用户运行
+if [[ $EUID -ne 0 ]]; then
+  echo "请以 root 权限运行此脚本（使用 sudo）"
+  exit 1
+fi
+
 function check_command() {
   command -v "$1" >/dev/null 2>&1
 }
@@ -25,12 +31,11 @@ function ensure_dependencies() {
   echo "检查并安装依赖..."
 
   if ! check_command locale-gen && ! check_command localedef; then
-    echo "缺少 locale 相关工具"
-    install_package locales || install_package glibc-common
+    echo "缺少 locale 工具，尝试安装..."
+    install_package locales || install_package glibc-common || install_package glibc-langpack-en
   fi
 
   if ! check_command timedatectl; then
-    echo "缺少 timedatectl"
     install_package systemd
   fi
 
@@ -39,7 +44,6 @@ function ensure_dependencies() {
   fi
 
   if ! check_command passwd; then
-    echo "缺少 passwd 命令"
     install_package passwd
   fi
 
@@ -61,14 +65,20 @@ function change_locale() {
   esac
 
   echo "设置语言为 $locale..."
+
   if check_command locale-gen; then
     sed -i "s/^LANG=.*/LANG=$locale/" /etc/default/locale || echo "LANG=$locale" > /etc/default/locale
     locale-gen "$locale"
     update-locale LANG="$locale"
   elif check_command localedef; then
-    localedef -v -c -i "${locale%%.*}" -f UTF-8 "$locale" || true
-    echo "LANG=$locale" > /etc/locale.conf
+    if [ -d "/usr/share/i18n/charmaps" ]; then
+      localedef -v -c -i "${locale%%.*}" -f UTF-8 "$locale" || true
+    else
+      echo "[警告] 缺少字符集定义，跳过 localedef"
+    fi
+    echo "LANG=$locale" | tee /etc/locale.conf >/dev/null
   fi
+
   echo "语言修改完成"
 }
 
