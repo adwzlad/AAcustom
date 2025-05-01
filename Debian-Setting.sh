@@ -36,7 +36,6 @@ ensure_dependencies() {
   ! check_command timedatectl && install_package systemd
   ! check_command curl && install_package curl
   ! check_command passwd && install_package passwd
-  ! check_command ss && install_package iproute2
 
   echo "依赖检查完成"
 }
@@ -125,8 +124,33 @@ enable_root_login() {
   echo "启用 root 密码登录..."
   passwd root
   sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin yes/' /etc/ssh/sshd_config
-  systemctl restart ssh || systemctl restart sshd
+  systemctl restart ssh
   echo "已启用 root 密码登录并重启 SSH 服务"
 }
 
-# 修改 SSH 端口
+# 主菜单
+main_menu() {
+  ensure_dependencies
+
+  while true; do
+    echo ""
+    echo "==== 系统配置菜单 ===="
+    echo "1) 修改系统语言"
+    echo "2) 修改系统时区"
+    echo "3) 修改指定账户SSH密码"
+    echo "4) 启用ROOT密码登录"
+    echo "0) 退出"
+    read -p "请选择操作 [0-4]: " opt
+
+    case $opt in
+      1) change_locale ;;
+      2) change_timezone ;;
+      3) change_ssh_password ;;
+      4) enable_root_login ;;
+      0) echo "退出脚本"; break ;;
+      *) echo "无效选项" ;;
+    esac
+  done
+}
+
+main_menu
