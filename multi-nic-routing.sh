@@ -12,6 +12,12 @@ cat > "$ROUTE_SCRIPT" <<'EOF'
 #!/bin/bash
 set -e
 
+# 确保 sipcalc 安装（用于 IPv6 子网解析）
+if ! command -v sipcalc >/dev/null 2>&1; then
+  echo "🔧 正在安装 sipcalc..."
+  apt update && apt install -y sipcalc
+fi
+
 echo "🧹 清除旧的规则和路由表..."
 ip -4 rule | grep -E 'from 10\.' | while read -r line; do
   PRIO=$(echo "$line" | awk '{print $1}' | tr -d ':')
@@ -49,11 +55,11 @@ done
 # IPv6配置
 ip -o -6 addr show scope global | awk '{print $2, $4}' | while read -r IFACE IPADDR; do
   IP=$(echo "$IPADDR" | cut -d/ -f1)
-  SUBNET=$(sipcalc "$IPADDR" | grep -i "Network address" | awk '{print $4"/"$5}')
+  SUBNET=$(sipcalc "$IPADDR" | awk -F - '/Network range/ {print $2}' | sed 's/ //g')
   GATEWAY=$(ip -6 route | grep "^default.*dev $IFACE" | awk '{print $3}')
 
   TABLE_NAME="rt_$IFACE"
-  ip -6 route replace "$SUBNET" dev "$IFACE" table "$TABLE_NAME" || true
+  [[ -n "$SUBNET" ]] && ip -6 route replace "$SUBNET" dev "$IFACE" table "$TABLE_NAME" || true
   [ -n "$GATEWAY" ] && ip -6 route replace default via "$GATEWAY" dev "$IFACE" table "$TABLE_NAME" || true
   ip -6 rule add from "$IP/128" table "$TABLE_NAME" priority "$TABLE_INDEX" || true
 
