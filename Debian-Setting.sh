@@ -1,101 +1,135 @@
 #!/bin/bash
+
 set -e
 
 # 检查是否为 root 用户
 if [[ $EUID -ne 0 ]]; then
-  echo "请以 root 权限运行此脚本（使用 sudo）"
+  echo "请以 root 权限运行此脚本！"
   exit 1
 fi
 
-# 检查命令存在
-check_command() {
-  command -v "$1" >/dev/null 2>&1
-}
-
 # 自动安装依赖包
-install_package() {
-  local pkg=$1
-  echo "安装依赖项：$pkg..."
-  if check_command apt; then
-    apt update && apt install -y "$pkg"
-  elif check_command dnf; then
-    dnf install -y "$pkg"
-  elif check_command yum; then
-    yum install -y "$pkg"
-  else
-    echo "不支持的包管理器，请手动安装 $pkg"
-    exit 1
-  fi
+install_dependencies() {
+  apt-get update
+  apt-get install -y curl locales tzdata
 }
 
-# 确保必要依赖存在
-ensure_dependencies() {
-  echo "检查并安装依赖..."
-
-  ! check_command locale-gen && ! check_command localedef && install_package locales
-  ! check_command timedatectl && install_package systemd
-  ! check_command curl && install_package curl
-  ! check_command passwd && install_package passwd
-
-  echo "依赖检查完成"
+restart_ssh() {
+  echo "正在重启 SSH 服务..."
+  systemctl restart ssh || systemctl restart sshd
 }
 
-# 设置系统语言
-change_locale() {
-  echo "选择系统语言:"
-  echo "1) 英语 (en_US.UTF-8)"
-  echo "2) 简体中文 (zh_CN.UTF-8)"
-  echo "3) 繁体中文 (zh_TW.UTF-8)"
-  read -p "请输入选项 [1-3]: " locale_choice
+# 1. 开启 root 密码登录
+enable_root_login() {
+  echo "开启 root 密码登录..."
+  sed -i "s/^#\?PermitRootLogin .*/PermitRootLogin yes/" /etc/ssh/sshd_config
+  sed -i "s/^#\?PasswordAuthentication .*/PasswordAuthentication yes/" /etc/ssh/sshd_config
+  restart_ssh
+  echo "已开启 root 密码登录。"
+}
 
-  case $locale_choice in
-    1) locale="en_US.UTF-8" ;;
-    2) locale="zh_CN.UTF-8" ;;
-    3) locale="zh_TW.UTF-8" ;;
-    *) echo "无效选择"; return ;;
-  esac
+# 2. 修改账户密码
+change_user_password() {
+  read -p "请输入要修改密码的用户名（默认 root）: " user
+  user=${user:-root}
 
-  echo "设置语言为 $locale..."
-
-  if check_command apt; then
-    install_package locales
-    grep -q "^${locale}" /etc/locale.gen || echo "${locale} UTF-8" >> /etc/locale.gen
-    locale-gen
-    update-locale LANG=$locale
-    echo "LANG=$locale" > /etc/default/locale
-  elif check_command dnf || check_command yum; then
-    pkgname="glibc-langpack-${locale%%_*}"
-    install_package "$pkgname"
-    if [ -d "/usr/share/i18n/locales" ] && [ -d "/usr/share/i18n/charmaps" ]; then
-      localedef -c -i "${locale%%.*}" -f UTF-8 "$locale" || true
-    else
-      echo "[警告] 缺少 i18n 路径，跳过 localedef"
-    fi
-    echo "LANG=$locale" | tee /etc/locale.conf >/dev/null
-  else
-    echo "[错误] 无法识别系统环境，请手动配置 locale"
+  if ! id "$user" &>/dev/null; then
+    echo "用户 $user 不存在！"
     return
   fi
 
-  echo "语言设置完成为 $locale"
+  read -p "请输入新密码（明文输入）: " new_pass
+  echo "$user:$new_pass" | chpasswd
+  echo "已修改 $user 的密码。"
+  restart_ssh
 }
 
-# 设置系统时区
-change_timezone() {
-  echo "选择时区:"
-  echo "1) 台北"
-  echo "2) 香港"
-  echo "3) 新加坡"
-  echo "4) 自动获取（基于公网 IP）"
-  read -p "请输入选项 [1-4]: " tz_choice
+# 3. 修改 SSH 端口
+change_ssh_port() {
+  read -p "请输入新的 SSH 端口（默认 36098）: " new_port
+  new_port=${new_port:-36098}
 
-  case $tz_choice in
-    1) timezone="Asia/Taipei" ;;
-    2) timezone="Asia/Hong_Kong" ;;
-    3) timezone="Asia/Singapore" ;;
+  sed -i "s/^#\?Port .*/Port $new_port/" /etc/ssh/sshd_config
+  echo "已修改 SSH 端口为 $new_port。"
+  restart_ssh
+}
+
+# 4. 修改系统语言
+change_language() {
+  echo "选择系统语言:"
+  echo "1. 英语 (en_US.UTF-8)"
+  echo "2. 简体中文 (zh_CN.UTF-8)"
+  echo "3. 繁体中文 (zh_TW.UTF-8)"
+  read -p "请输入选项 [1-3]: " lang_option
+
+  case $lang_option in
+    1) lang="en_US.UTF-8" ;;
+    2) lang="zh_CN.UTF-8" ;;
+    3) lang="zh_TW.UTF-8" ;;
+    *) echo "无效选项。"; return ;;
+  esac
+
+  echo "设置语言为 $lang..."
+  sed -i "s/^# *$lang/$lang/" /etc/locale.gen || echo "$lang UTF-8" >> /etc/locale.gen
+  locale-gen
+  update-locale LANG=$lang
+  echo "系统语言已设置为 $lang。请重新登录生效。"
+}
+
+# 5. 设置系统时区
+set_timezone() {
+  echo "选择时区:"
+  echo "1. 台北 (Asia/Taipei)"
+  echo "2. 香港 (Asia/Hong_Kong)"
+  echo "3. 新加坡 (Asia/Singapore)"
+  echo "4. 自动设置（基于公网 IP）"
+  read -p "请输入选项 [1-4]: " tz_option
+
+  case $tz_option in
+    1) tz="Asia/Taipei" ;;
+    2) tz="Asia/Hong_Kong" ;;
+    3) tz="Asia/Singapore" ;;
     4)
-      if check_command curl; then
-        timezone=$(curl -s https://ipapi.co/timezone)
-        echo "自动检测到时区：$timezone"
-      else
-        echo "无法使用 curl 自动检测，请
+      echo "正在自动检测时区..."
+      tz=$(curl -s --max-time 10 http://worldtimeapi.org/api/ip | grep '"timezone"' | cut -d\" -f4)
+      if [[ -z "$tz" ]]; then
+        echo "无法自动获取时区。"
+        return
+      fi
+      ;;
+    *) echo "无效选项。"; return ;;
+  esac
+
+  timedatectl set-timezone "$tz"
+  echo "时区已设置为 $tz。"
+}
+
+main_menu() {
+  echo "=== Debian 系统设置脚本 ==="
+  echo "1. 开启 root 密码登录"
+  echo "2. 修改账户密码"
+  echo "3. 修改 SSH 端口"
+  echo "4. 修改系统语言"
+  echo "5. 设置系统时区"
+  echo "0. 退出"
+  echo "=========================="
+
+  read -p "请输入选项 [0-5]: " choice
+
+  case $choice in
+    1) enable_root_login ;;
+    2) change_user_password ;;
+    3) change_ssh_port ;;
+    4) change_language ;;
+    5) set_timezone ;;
+    0) exit 0 ;;
+    *) echo "无效选项。" ;;
+  esac
+}
+
+install_dependencies
+
+while true; do
+  main_menu
+  echo
+done
