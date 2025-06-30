@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "name": "geoip-wechat",
   "rules": [
     {
       "ip_cidr": [
