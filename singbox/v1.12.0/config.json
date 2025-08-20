@@ -101,7 +101,7 @@
       {"rule_set": "geosite-microsoft", "outbound": "Ⓜ️ Microsoft"},
       {"rule_set": "geosite-onedrive", "outbound": "🪟 OneDrive"},
       {"rule_set": ["geosite-apple", "geoip-apple"], "outbound": "🍎 Apple"},
-      {"rule_set": "geosite-wechat", "outbound": "🤢 WeChat"},
+      {"rule_set": ["geosite-wechat", "geoip-wechat"], "outbound": "🤢 WeChat"},
       {"rule_set": "geosite-proxy", "outbound": "🏴‍☠️ Proxy"},
       {"rule_set": "geosite-!cn", "outbound": "🚀 节点选择"},
       {"rule_set": ["geosite-steamcn", "geosite-cn", "geoip-cn"], "outbound": "🎯 全球直连"}
@@ -130,6 +130,7 @@
       {"tag": "geosite-apple", "type": "remote", "format": "binary", "url": "https://gaus.dpdns.org/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/apple.srs", "download_detour": "🎯 全球直连", "update_interval": "48h"},
       {"tag": "geoip-apple", "type": "remote", "format": "binary", "url": "https://gaus.dpdns.org/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo-lite/geoip/apple.srs", "download_detour": "🎯 全球直连", "update_interval": "48h"},
       {"tag": "geosite-wechat", "type": "remote", "format": "source", "url": "https://gaus.dpdns.org/https://raw.githubusercontent.com/adwzlad/AAcustom/main/singbox/geosite-wechat.json", "download_detour": "🎯 全球直连", "update_interval": "48h"},
+      {"tag": "geoip-wechat", "type": "remote", "format": "source", "url": "https://gaus.dpdns.org/https://raw.githubusercontent.com/adwzlad/AAcustom/main/singbox/geoip-wechat.json", "download_detour": "🎯 全球直连", "update_interval": "48h"},
       {"tag": "geosite-proxy", "type": "remote", "format": "source", "url": "https://gaus.dpdns.org/https://raw.githubusercontent.com/adwzlad/AAcustom/main/singbox/geosite-proxy.json", "download_detour": "🎯 全球直连", "update_interval": "1h"},
       {"tag": "geosite-!cn", "type": "remote", "format": "binary", "url": "https://gaus.dpdns.org/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/geolocation-!cn.srs", "download_detour": "🎯 全球直连", "update_interval": "48h"},
       {"tag": "geosite-steamcn", "type": "remote", "format": "binary", "url": "https://gaus.dpdns.org/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/steam@cn.srs", "download_detour": "🎯 全球直连", "update_interval": "48h"},
@@ -163,7 +164,7 @@
     "clash_api": {
       "external_controller": "0.0.0.0:9095",
       "external_ui": "/etc/momo/run/ui",
-      "external_ui_download_url": "https://gh-proxy.com/https://github.com/Zephyruso/zashboard/archive/refs/heads/gh-pages.zip",
+      "external_ui_download_url": "https://gaus.dpdns.org/https://github.com/Zephyruso/zashboard/archive/refs/heads/gh-pages.zip",
       "external_ui_download_detour": "🎯 全球直连",
       "secret": "",
       "default_mode": "rule"
