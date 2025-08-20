@@ -1,0 +1,62 @@
+{
+  "dns": {
+    "servers": [
+      {"tag": "public", "type": "udp", "server": "223.5.5.5"}
+    ],
+    "rules": [
+      {"query_type": "HTTPS", "action": "reject"},
+      {"rule_set": ["geosite-ads", "geosite-adblock", "geosite-anti"], "server": "public"}
+    ],
+    "final": "public",
+    "strategy": "prefer_ipv6",
+    "independent_cache": true
+  },
+  "outbounds": [
+    {"tag": "🎯 全球直连", "type": "direct"},
+    {"tag": "🛑 全球拦截", "type": "block"}
+  ],
+  "route": {
+    "rules": [
+      {"action": "sniff", "sniffer": ["http", "tls", "quic", "dns"]},
+      {"type": "logical", "mode": "or", "rules": [{"port": 53}, {"protocol": "dns"}], "action": "hijack-dns"},
+      {"ip_is_private": true, "outbound": "🎯 全球直连"},
+      {"clash_mode": "direct", "outbound": "🎯 全球直连"},
+      {"clash_mode": "global", "outbound": "🎯 全球直连"},
+      {"rule_set": ["geosite-ads", "geosite-adblock", "geosite-anti"], "outbound": "🛑 全球拦截"}
+    ],
+    "rule_set": [
+      {"tag": "geosite-ads", "type": "remote", "format": "binary", "url": "https://gaus.dpdns.org/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/category-ads-all.srs", "download_detour": "🎯 全球直连", "update_interval": "48h"},
+      {"tag": "geosite-adblock", "type": "remote", "format": "binary", "url": "https://gaus.dpdns.org/https://raw.githubusercontent.com/REIJI007/AdBlock_Rule_For_Sing-box/main/adblock_reject.srs", "download_detour": "🎯 全球直连", "update_interval": "48h"},
+      {"tag": "geosite-anti", "type": "remote", "format": "binary", "url": "https://gaus.dpdns.org/https://raw.githubusercontent.com/privacy-protection-tools/anti-ad.github.io/master/docs/anti-ad-sing-box.srs", "download_detour": "🎯 全球直连", "update_interval": "48h"}
+    ],
+    "final": "🎯 全球直连",
+    "auto_detect_interface": true,
+    "default_domain_resolver": {"server": "public"}
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "address": [
+        "172.19.0.1/30",
+        "fdfe:dcba:9876::1/126"
+      ],
+      "mtu": 9000,
+      "auto_route": true
+    }
+  ],
+  "experimental": {
+    "cache_file": {
+      "enabled": true
+    },
+    "clash_api": {
+      "external_controller": "127.0.0.1:9095",
+      "secret": "",
+      "default_mode": "rule"
+    }
+  },
+  "log": {
+    "disabled": false,
+    "level": "info",
+    "timestamp": true
+  }
+}
