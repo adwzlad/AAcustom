@@ -5,7 +5,7 @@
     ],
     "rules": [
       {"query_type": "HTTPS", "action": "reject"},
-      {"rule_set": ["geosite-ads", "geosite-adblock", "geosite-anti"], "server": "public"}
+      {"rule_set": ["geosite-ads", "geosite-adblock", "geosite-anti"], "server": "🛑 全球拦截"}
     ],
     "final": "public",
     "strategy": "prefer_ipv6",
