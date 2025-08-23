@@ -1,8 +1,8 @@
-Debian/Ubuntu 一键部署 Google Cloud 多网卡策略路由配置脚本。。如果遇到任何问题，检查 systemd 服务的状态（systemctl status multi-nic-routing.service）以确认是否有错误。
+Debian/Ubuntu 系统清理
 
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/multi-nic-routing.sh)
+bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/clean-debian.sh)
 
-bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/multi-nic-routing.sh)
+bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/clean-debian.sh.sh)
 
 更换系统语言、修改时区/密码/SSH
 
