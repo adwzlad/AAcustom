@@ -42,7 +42,11 @@ bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/fake_cer
 
 防火墙管理firewall-site.sh
 
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/firewall.sh)
+sudo bash -c "curl -sL https://github.com/adwzlad/AAcustom/raw/main/firewall.sh -o /root/firewall.sh && chmod +x /root/firewall.sh && /root/firewall.sh"
+
+debian12备份恢复
+
+sudo bash -c "curl -sL https://github.com/adwzlad/AAcustom/raw/main/debian_block.sh -o /root/debian_block.sh && chmod +x /root/debian_block.sh && /root/debian_block.sh"
 
 UFW防火墙规则配置，并定时每天凌晨 4 点更新关于cloudflare_ip的规则
 
