@@ -1,5 +1,5 @@
 #!/bin/bash
-# 防火墙交互管理脚本 - 最终修复版
+# 防火墙交互管理脚本 - 最终完整版
 
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; BOLD="\033[1m"; RESET="\033[0m"
 
@@ -130,4 +130,38 @@ menu_icmp() {
   fi
   pause
 }
-menu_outbound() { read
+menu_outbound() { read -r -p "允许所有出站？(y/n): " x; [[ "$x" =~ ^[Yy]$ ]] && ufw default allow outgoing || ufw default deny outgoing; pause; }
+
+# ===== 主菜单 =====
+main_menu() {
+  while true; do
+    clear
+    status_summary
+    echo -e "\n${CYAN}${BOLD}—— 防火墙管理菜单 ——${RESET}"
+    echo "1) 入站 SSH"
+    echo "2) 入站 TCP"
+    echo "3) 入站 UDP"
+    echo "4) 入站 ICMP"
+    echo "5) 出站规则"
+    echo "6) 批量导入端口"
+    echo "7) 批量导出端口"
+    echo "0) 退出并应用"
+    read -r -p "选择: " op
+    case "$op" in
+      1) menu_ssh ;;
+      2) menu_tcp ;;
+      3) menu_udp ;;
+      4) menu_icmp ;;
+      5) menu_outbound ;;
+      6) import_ports ;;
+      7) export_ports ;;
+      0) ufw reload; echo -e "${GREEN}防火墙规则已应用${RESET}"; exit 0 ;;
+      *) echo -e "${RED}无效选项${RESET}"; pause ;;
+    esac
+  done
+}
+
+# ===== 初始化 =====
+ensure_ufw
+ensure_ssh_safe
+main_menu
