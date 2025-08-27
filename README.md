@@ -44,16 +44,6 @@ bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/fake_cer
 
 sudo bash -c "curl -sL https://github.com/adwzlad/AAcustom/raw/main/firewall.sh -o /root/firewall.sh && chmod +x /root/firewall.sh && /root/firewall.sh"
 
-debian12备份恢复
-
-sudo bash -c "curl -sL https://github.com/adwzlad/AAcustom/raw/main/backup.sh -o /root/backup.sh && chmod +x /root/backup.sh
-
-备份整盘 /dev/sdb 到 /root/UARM_backup：    sudo ./full_backup.sh /dev/sdb /root/UARM_backup pigz
-
-sudo bash -c "curl -sL https://github.com/adwzlad/AAcustom/raw/main/restore.sh -o /root/restore.sh && chmod +x /root/restore.sh
-
-恢复到目标磁盘 /dev/sdc：     sudo ./full_restore.sh /dev/sdc /root/UARM_backup
-
 UFW防火墙规则配置，并定时每天凌晨 4 点更新关于cloudflare_ip的规则
 
 bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/manage_ufw.sh)
