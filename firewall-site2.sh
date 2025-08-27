@@ -1,13 +1,11 @@
 #!/bin/bash
-# 防火墙交互管理脚本 (Debian/Ubuntu) - 修复版
+# 防火墙交互管理脚本 (Debian/Ubuntu) - 最终增强版
 
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; BOLD="\033[1m"; RESET="\033[0m"
 
 # Root 校验
 [[ $EUID -ne 0 ]] && echo -e "${RED}请使用 root 用户运行${RESET}" && exit 1
 
-# ===== 基础函数 =====
-confirm() { read -r -p "$1 [y/N]: " x; [[ "$x" =~ ^[Yy]$ ]]; }
 pause() { read -r -p "按回车返回上级菜单..." _; }
 
 # ===== 安装/启用 UFW =====
@@ -67,9 +65,18 @@ allow_tokens() {
   ensure_ssh_safe
   for tok in "$@"; do
     if [[ "$tok" =~ : ]]; then
-      ufw allow "${tok}/${proto}" && echo -e "${GREEN}放行 ${tok}/${proto}${RESET}"
+      start=${tok%%:*}; end=${tok##*:}
+      skip_all=true
+      for ((p=start;p<=end;p++)); do
+        if ! ufw status | grep -qE "ALLOW.*\b${p}/${proto}\b"; then
+          skip_all=false
+          ufw allow "${start}:${end}/${proto}" && echo -e "${GREEN}放行 ${start}:${end}/${proto}${RESET}"
+          break
+        fi
+      done
+      $skip_all && echo -e "${YELLOW}${tok}/${proto} 已存在，跳过${RESET}"
     else
-      ufw status | grep -qE "ALLOW.*\b${tok}/${proto}\b" && echo -e "${YELLOW}${tok}/${proto} 已存在${RESET}" || ufw allow "${tok}/${proto}" && echo -e "${GREEN}放行 ${tok}/${proto}${RESET}"
+      ufw status | grep -qE "ALLOW.*\b${tok}/${proto}\b" && echo -e "${YELLOW}${tok}/${proto} 已存在，跳过${RESET}" || ufw allow "${tok}/${proto}" && echo -e "${GREEN}放行 ${tok}/${proto}${RESET}"
     fi
   done
 }
