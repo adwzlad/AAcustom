@@ -1,14 +1,10 @@
 #!/bin/bash
-# 防火墙交互管理脚本 (Debian/Ubuntu) - 完整增强版
+# 防火墙交互管理脚本 (Debian/Ubuntu) - 修复版
 
-# ===== 颜色 =====
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; BOLD="\033[1m"; RESET="\033[0m"
 
-# ===== Root 校验 =====
-if [[ $EUID -ne 0 ]]; then
-  echo -e "${RED}此脚本必须以 root 用户运行！${RESET}"
-  exit 1
-fi
+# Root 校验
+[[ $EUID -ne 0 ]] && echo -e "${RED}请使用 root 用户运行${RESET}" && exit 1
 
 # ===== 基础函数 =====
 confirm() { read -r -p "$1 [y/N]: " x; [[ "$x" =~ ^[Yy]$ ]]; }
@@ -16,16 +12,9 @@ pause() { read -r -p "按回车返回上级菜单..." _; }
 
 # ===== 安装/启用 UFW =====
 ensure_ufw() {
-  if ! command -v ufw >/dev/null 2>&1; then
-    echo -e "${YELLOW}未检测到 UFW，正在安装...${RESET}"
-    apt-get update -y && apt-get install -y ufw
-  fi
-  if [[ -f /etc/default/ufw ]]; then
-    IPV6_STATE=$(grep -E '^IPV6=' /etc/default/ufw | awk -F= '{print $2}')
-    [[ -z "$IPV6_STATE" ]] && IPV6_STATE="(未设置)"
-  else
-    IPV6_STATE="(配置缺失)"
-  fi
+  command -v ufw >/dev/null 2>&1 || { echo -e "${YELLOW}未检测到 UFW，正在安装...${RESET}"; apt-get update -y && apt-get install -y ufw; }
+  IPV6_STATE=$(grep -E '^IPV6=' /etc/default/ufw 2>/dev/null | awk -F= '{print $2}')
+  [[ -z "$IPV6_STATE" ]] && IPV6_STATE="yes"
   ufw status | grep -qi "inactive" && ufw --force enable
 }
 
@@ -39,8 +28,7 @@ ensure_ssh_safe() {
 
 # ===== 解析端口文本 =====
 normalize_and_validate_ports() {
-  local raw="$1"
-  raw="${raw//,/ }" && raw=$(echo "$raw" | xargs)
+  local raw="$1"; raw="${raw//,/ }" && raw=$(echo "$raw" | xargs)
   local tokens=(); local t
   for t in $raw; do
     if [[ "$t" =~ ^([0-9]{1,5})[[:space:]]*[:-][[:space:]]*([0-9]{1,5})$ ]]; then
@@ -66,9 +54,9 @@ status_summary() {
   [[ -z "$outpol" ]] && outpol="未知"
   echo -e "\n${CYAN}${BOLD}—— 当前状态 ——${RESET}"
   echo -e "IPv6 开关：${BOLD}${IPV6_STATE}${RESET}"
-  echo -e "入站 SSH：${BOLD}$(ufw status | awk '/ALLOW/ && /\/tcp/ && ($1 ~ /^[0-9]+$/ || $1 ~ /:)/{print $1"/tcp"}' | paste -sd',' - || echo 无)${RESET}"
-  echo -e "入站 TCP：${BOLD}$(ufw status | awk '/ALLOW/ && /\/tcp/{print $1}' | sed 's#/tcp##' | paste -sd',' - || echo 无)${RESET}"
-  echo -e "入站 UDP：${BOLD}$(ufw status | awk '/ALLOW/ && /\/udp/{print $1}' | sed 's#/udp##' | paste -sd',' - || echo 无)${RESET}"
+  echo -e "入站 SSH：${BOLD}$(ufw status | awk '/ALLOW/ && /\/tcp/ && $1 ~ /^[0-9]+$/ {print $1"/tcp"}' | paste -sd',' - || echo 无)${RESET}"
+  echo -e "入站 TCP：${BOLD}$(ufw status | awk '/ALLOW/ && /\/tcp/{print $1}' | sed 's#/tcp##' | grep -v "^${SSH_PORT}$" | paste -sd',' - || echo 无)${RESET}"
+  echo -e "入站 UDP：${BOLD}$(ufw status | awk '/ALLOW/ && /\/udp/{print $1}' | paste -sd',' - || echo 无)${RESET}"
   echo -e "入站 ICMP：${BOLD}${icmp}${RESET}"
   echo -e "出站策略：${BOLD}${outpol}${RESET}"
 }
@@ -76,7 +64,7 @@ status_summary() {
 # ===== 放行端口 =====
 allow_tokens() {
   local proto="$1"; shift
-  ensure_ssh_safe  # 每次操作前确保 SSH 安全
+  ensure_ssh_safe
   for tok in "$@"; do
     if [[ "$tok" =~ : ]]; then
       ufw allow "${tok}/${proto}" && echo -e "${GREEN}放行 ${tok}/${proto}${RESET}"
@@ -90,18 +78,18 @@ allow_tokens() {
 delete_by_numbered() {
   ensure_ssh_safe
   ufw status numbered
-  read -r -p "输入要删除的编号（可空格分隔）： " ids
-  [[ -z "$ids" ]] && echo "未输入编号" && return
+  read -r -p "输入要删除的编号（空返回）： " ids
+  [[ -z "$ids" ]] && return
   ids_sorted=$(echo "$ids" | xargs -n1 | sort -nr)
   while read -r id; do ufw --force delete "$id"; done <<< "$ids_sorted"
 }
 
-# ===== 批量导入端口 =====
+# ===== 批量导入/导出 =====
 import_ports() {
   ensure_ssh_safe
-  read -r -p "输入要导入的文件路径: " file
+  read -r -p "输入文件路径: " file
   [[ ! -f "$file" ]] && echo -e "${RED}文件不存在${RESET}" && return
-  read -r -p "协议 (tcp/udp)：" proto
+  read -r -p "协议 (tcp/udp): " proto
   [[ "$proto" != "tcp" && "$proto" != "udp" ]] && echo -e "${RED}协议错误${RESET}" && return
   while read -r line; do
     [[ -z "$line" || "$line" =~ ^# ]] && continue
@@ -110,12 +98,11 @@ import_ports() {
   done < "$file"
 }
 
-# ===== 批量导出端口 =====
 export_ports() {
   ensure_ssh_safe
   read -r -p "输出文件路径: " outfile
   echo "# SSH 端口" > "$outfile"
-  ufw status | awk '/ALLOW/ && /\/tcp/ && ($1 ~ /^[0-9]+$/ || $1 ~ /:)/{print $1}' >> "$outfile"
+  ufw status | awk '/ALLOW/ && /\/tcp/ && $1 ~ /^[0-9]+$/ {print $1}' >> "$outfile"
   echo "# TCP 端口" >> "$outfile"
   ufw status | awk '/ALLOW/ && /\/tcp/{print $1}' | sed 's#/tcp##' >> "$outfile"
   echo "# UDP 端口" >> "$outfile"
@@ -125,11 +112,11 @@ export_ports() {
   echo -e "${GREEN}导出完成：$outfile${RESET}"
 }
 
-# ===== 子菜单函数 =====
+# ===== 子菜单 =====
 menu_ssh() { read -r -p "输入要放行的 SSH 端口（空返回）： " p; [[ -n "$p" ]] && normalize_and_validate_ports "$p" && allow_tokens tcp "${PORT_TOKENS[@]}"; pause; }
 menu_tcp() { read -r -p "输入要放行 TCP 端口或范围： " p; [[ -n "$p" ]] && normalize_and_validate_ports "$p" && allow_tokens tcp "${PORT_TOKENS[@]}"; pause; }
 menu_udp() { read -r -p "输入要放行 UDP 端口或范围： " p; [[ -n "$p" ]] && normalize_and_validate_ports "$p" && allow_tokens udp "${PORT_TOKENS[@]}"; pause; }
-menu_icmp() { ufw status | grep -qE "ALLOW IN.*icmp" && echo -e "${YELLOW}ICMP 已放行${RESET}" || (ufw allow proto icmp && echo -e "${GREEN}ICMP 已放行${RESET}"); pause; }
+menu_icmp() { ufw status | grep -qE "ALLOW IN.*icmp" && echo -e "${YELLOW}ICMP 已放行${RESET}" || (ufw allow in proto icmp && echo -e "${GREEN}ICMP 已放行${RESET}"); pause; }
 menu_outbound() { read -r -p "允许所有出站？(y/n): " x; [[ "$x" =~ ^[Yy]$ ]] && ufw default allow outgoing || ufw default deny outgoing; pause; }
 
 # ===== 主菜单 =====
