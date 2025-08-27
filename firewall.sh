@@ -1,167 +1,234 @@
 #!/bin/bash
-# 防火墙交互管理脚本 - 完整版
+# firewall.sh - 全自动防火墙脚本（Debian 12）
 
-RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; BOLD="\033[1m"; RESET="\033[0m"
+WORK_DIR="/root/firewall"
+PROT_FILE="$WORK_DIR/prot"
+IPV4_RULES="$WORK_DIR/ipv4_rules.sh"
+IPV6_RULES="$WORK_DIR/ipv6_rules.sh"
+LAST_MOD_FILE="$WORK_DIR/.prot_last_mod"
 
-[[ $EUID -ne 0 ]] && echo -e "${RED}请使用 root 用户运行${RESET}" && exit 1
-
-pause() { read -r -p "按回车返回上级菜单..." _; }
-
-# ===== 安装/启用 UFW =====
-ensure_ufw() {
-  command -v ufw >/dev/null 2>&1 || { echo -e "${YELLOW}未检测到 UFW，正在安装...${RESET}"; apt-get update -y && apt-get install -y ufw; }
-  IPV6_STATE=$(grep -E '^IPV6=' /etc/default/ufw 2>/dev/null | awk -F= '{print $2}')
-  [[ -z "$IPV6_STATE" ]] && IPV6_STATE="yes"
-  ufw status | grep -qi "inactive" && ufw --force enable
+check_root() {
+    [ "$EUID" -ne 0 ] && { echo "❌ 请用 root 权限运行"; exit 1; }
 }
 
-# ===== SSH 防断连 =====
-ensure_ssh_safe() {
-  read -r -p "请输入当前 SSH 端口（默认 22）: " SSH_PORT
-  SSH_PORT=${SSH_PORT:-22}
-  [[ ! $SSH_PORT =~ ^[0-9]{1,5}$ ]] && echo -e "${RED}端口无效${RESET}" && exit 1
-  ufw status | grep -qE "ALLOW.*\b${SSH_PORT}/tcp\b" || ufw allow "${SSH_PORT}/tcp"
+mkdir -p "$WORK_DIR"
+
+install_persistent() {
+    echo "📦 安装 iptables-persistent..."
+    apt update -y
+    DEBIAN_FRONTEND=noninteractive apt install -y iptables-persistent
+    systemctl enable netfilter-persistent
+    systemctl start netfilter-persistent
 }
 
-# ===== 解析端口文本 =====
-normalize_and_validate_ports() {
-  local raw="$1"; raw="${raw//,/ }" && raw=$(echo "$raw" | xargs)
-  local tokens=(); local t
-  for t in $raw; do
-    if [[ "$t" =~ ^([0-9]{1,5})[[:space:]]*[:-][[:space:]]*([0-9]{1,5})$ ]]; then
-      local a="${BASH_REMATCH[1]}"; local b="${BASH_REMATCH[2]}"
-      [[ $a -ge 1 && $a -le 65535 && $b -ge 1 && $b -le 65535 && $a -le $b ]] || { echo -e "${RED}无效端口范围：$t${RESET}"; return 1; }
-      tokens+=("${a}:${b}")
-    elif [[ "$t" =~ ^[0-9]{1,5}$ ]]; then
-      [[ $t -ge 1 && $t -le 65535 ]] || { echo -e "${RED}无效端口：$t${RESET}"; return 1; }
-      tokens+=("$t")
-    else
-      echo -e "${RED}无法识别端口/范围：$t${RESET}"; return 1
+init_prot_file() {
+    if [ ! -f "$PROT_FILE" ]; then
+        echo "⚠️ 首次运行，生成示例 prot 文件: $PROT_FILE"
+        cat > "$PROT_FILE" <<EOF
+# tcp:端口列表
+# udp:端口列表
+# icmp
+tcp:80,443
+udp:53
+icmp
+EOF
+        echo "✅ 已生成 prot 文件，请编辑后再次运行脚本"
+        exit 0
     fi
-  done
-  PORT_TOKENS=("${tokens[@]}")
-  return 0
 }
 
-# ===== 状态展示 =====
-status_summary() {
-  local icmp="未明确"
-  ufw status verbose | grep -qE "ALLOW IN.*icmp" && icmp="允许"
-  local outpol=$(ufw status verbose | awk -F: '/Default:/{print $2}' | xargs)
-  [[ -z "$outpol" ]] && outpol="未知"
-  echo -e "\n${CYAN}${BOLD}—— 当前状态 ——${RESET}"
-  echo -e "IPv6 开关：${BOLD}${IPV6_STATE}${RESET}"
-  echo -e "入站 SSH：${BOLD}$(ufw status | awk '/ALLOW/ && /\/tcp/ && $1 ~ /^[0-9]+$/ {print $1"/tcp"}' | paste -sd',' - || echo 无)${RESET}"
-  echo -e "入站 TCP：${BOLD}$(ufw status | awk '/ALLOW/ && /\/tcp/{print $1}' | sed 's#/tcp##' | grep -v "^${SSH_PORT}$" | paste -sd',' - || echo 无)${RESET}"
-  echo -e "入站 UDP：${BOLD}$(ufw status | awk '/ALLOW/ && /\/udp/{print $1}' | paste -sd',' - || echo 无)${RESET}"
-  echo -e "入站 ICMP：${BOLD}${icmp}${RESET}"
-  echo -e "出站策略：${BOLD}${outpol}${RESET}"
+detect_stack() {
+    IPV4=0; IPV6=0
+    ip -4 addr show | grep -q "inet " && IPV4=1
+    ip -6 addr show | grep -q "inet6 " && IPV6=1
 }
 
-# ===== 放行端口 =====
-allow_tokens() {
-  local proto="$1"; shift
-  ensure_ssh_safe
-  for tok in "$@"; do
-    if [[ "$tok" =~ : ]]; then
-      start=${tok%%:*}; end=${tok##*:}
-      skip_all=true
-      for ((p=start;p<=end;p++)); do
-        if ! ufw status | grep -qE "ALLOW.*\b${p}/${proto}\b"; then
-          skip_all=false
-          ufw allow "${start}:${end}/${proto}" && echo -e "${GREEN}放行 ${start}:${end}/${proto}${RESET}"
-          break
-        fi
-      done
-      $skip_all && echo -e "${YELLOW}${tok}/${proto} 已存在，跳过${RESET}"
-    else
-      ufw status | grep -qE "ALLOW.*\b${tok}/${proto}\b" && echo -e "${YELLOW}${tok}/${proto} 已存在，跳过${RESET}" || ufw allow "${tok}/${proto}" && echo -e "${GREEN}放行 ${tok}/${proto}${RESET}"
+get_ssh_port() {
+    SSH_PORT=$(grep -i "^Port " /etc/ssh/sshd_config | awk '{print $2}' | head -n1)
+    [ -z "$SSH_PORT" ] && SSH_PORT=$(ss -tnlp | grep -i sshd | awk '{print $4}' | sed 's/.*://g' | sort -u | head -n1)
+    [ -z "$SSH_PORT" ] && SSH_PORT=22
+    echo "🔑 检测到 SSH 端口: $SSH_PORT"
+}
+
+get_last_mod() {
+    [ ! -f "$LAST_MOD_FILE" ] && echo 0 > "$LAST_MOD_FILE"
+    cat "$LAST_MOD_FILE"
+}
+
+update_last_mod() {
+    stat -c %Y "$PROT_FILE" > "$LAST_MOD_FILE"
+}
+
+prot_modified() {
+    last=$(get_last_mod)
+    current=$(stat -c %Y "$PROT_FILE")
+    [ "$current" -gt "$last" ] && return 0 || return 1
+}
+
+generate_ipv4_rules() {
+    echo "#!/bin/bash" > "$IPV4_RULES"
+    echo "iptables -F" >> "$IPV4_RULES"
+    echo "iptables -P INPUT DROP" >> "$IPV4_RULES"
+    echo "iptables -P FORWARD DROP" >> "$IPV4_RULES"
+    echo "iptables -P OUTPUT ACCEPT" >> "$IPV4_RULES"
+    echo "iptables -A INPUT -p tcp --dport $SSH_PORT -j ACCEPT" >> "$IPV4_RULES"
+    echo "iptables -A INPUT -i lo -j ACCEPT" >> "$IPV4_RULES"
+    echo "iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT" >> "$IPV4_RULES"
+
+    while read -r line; do
+        [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
+        proto=$(echo "$line" | cut -d: -f1)
+        ports=$(echo "$line" | cut -d: -f2- | tr -d ' ')
+        case "$proto" in
+            tcp)
+                for port in $(echo "$ports" | tr ',' ' '); do
+                    [[ "$port" == "$SSH_PORT" ]] && continue
+                    echo "iptables -A INPUT -p tcp --dport $port -j ACCEPT" >> "$IPV4_RULES"
+                done
+                ;;
+            udp)
+                for port in $(echo "$ports" | tr ',' ' '); do
+                    echo "iptables -A INPUT -p udp --dport $port -j ACCEPT" >> "$IPV4_RULES"
+                done
+                ;;
+            icmp)
+                echo "iptables -A INPUT -p icmp -j ACCEPT" >> "$IPV4_RULES"
+                ;;
+        esac
+    done < "$PROT_FILE"
+
+    chmod +x "$IPV4_RULES"
+    "$IPV4_RULES"
+}
+
+generate_ipv6_rules() {
+    echo "#!/bin/bash" > "$IPV6_RULES"
+    echo "ip6tables -F" >> "$IPV6_RULES"
+    echo "ip6tables -P INPUT DROP" >> "$IPV6_RULES"
+    echo "ip6tables -P FORWARD DROP" >> "$IPV6_RULES"
+    echo "ip6tables -P OUTPUT ACCEPT" >> "$IPV6_RULES"
+    echo "ip6tables -A INPUT -p tcp --dport $SSH_PORT -j ACCEPT" >> "$IPV6_RULES"
+    echo "ip6tables -A INPUT -i lo -j ACCEPT" >> "$IPV6_RULES"
+    echo "ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT" >> "$IPV6_RULES"
+
+    while read -r line; do
+        [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
+        proto=$(echo "$line" | cut -d: -f1)
+        ports=$(echo "$line" | cut -d: -f2- | tr -d ' ')
+        case "$proto" in
+            tcp)
+                for port in $(echo "$ports" | tr ',' ' '); do
+                    [[ "$port" == "$SSH_PORT" ]] && continue
+                    echo "ip6tables -A INPUT -p tcp --dport $port -j ACCEPT" >> "$IPV6_RULES"
+                done
+                ;;
+            udp)
+                for port in $(echo "$ports" | tr ',' ' '); do
+                    echo "ip6tables -A INPUT -p udp --dport $port -j ACCEPT" >> "$IPV6_RULES"
+                done
+                ;;
+            icmp)
+                echo "ip6tables -A INPUT -p ipv6-icmp -j ACCEPT" >> "$IPV6_RULES"
+                ;;
+        esac
+    done < "$PROT_FILE"
+
+    chmod +x "$IPV6_RULES"
+    "$IPV6_RULES"
+}
+
+save_persistent_rules() {
+    echo "💾 保存规则到持久化存储..."
+    netfilter-persistent save
+}
+
+create_systemd_timer() {
+    SERVICE_FILE="/etc/systemd/system/firewall-auto.service"
+    TIMER_FILE="/etc/systemd/system/firewall-auto.timer"
+
+    if [ ! -f "$SERVICE_FILE" ]; then
+        cat > "$SERVICE_FILE" <<EOF
+[Unit]
+Description=自动应用防火墙规则
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/firewall.sh
+EOF
+        systemctl daemon-reload
+        systemctl enable firewall-auto.service
+        echo "✅ 已创建 systemd 服务文件: $SERVICE_FILE"
     fi
-  done
+
+    if [ ! -f "$TIMER_FILE" ]; then
+        cat > "$TIMER_FILE" <<EOF
+[Unit]
+Description=每分钟检查并应用防火墙规则
+
+[Timer]
+OnUnitActiveSec=60s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+        systemctl daemon-reload
+        systemctl enable --now firewall-auto.timer
+        echo "✅ 已创建 systemd timer 文件: $TIMER_FILE 并启动"
+    fi
 }
 
-# ===== 删除规则 =====
-delete_by_numbered() {
-  ensure_ssh_safe
-  ufw status numbered
-  read -r -p "输入要删除的编号（空返回）： " ids
-  [[ -z "$ids" ]] && return
-  ids_sorted=$(echo "$ids" | xargs -n1 | sort -nr)
-  while read -r id; do ufw --force delete "$id"; done <<< "$ids_sorted"
+show_firewall_summary() {
+    echo "===== 当前防火墙规则汇总 ====="
+    echo "IPv4 支持: $([ $IPV4 -eq 1 ] && echo true || echo false) | IPv6 支持: $([ $IPV6 -eq 1 ] && echo true || echo false)"
+
+    # SSH 端口
+    echo "1. SSH 端口: $SSH_PORT"
+
+    # TCP 端口
+    TCP4=(); TCP6=()
+    [ $IPV4 -eq 1 ] && TCP4=($(iptables -S INPUT | grep "\-p tcp" | grep -- '--dport' | awk -F'--dport ' '{print $2}' | awk '{print $1}'))
+    [ $IPV6 -eq 1 ] && TCP6=($(ip6tables -S INPUT | grep "\-p tcp" | grep -- '--dport' | awk -F'--dport ' '{print $2}' | awk '{print $1}'))
+    TCP_ALL=$(printf "%s\n" "${TCP4[@]}" "${TCP6[@]}" | sort -n | uniq)
+    echo "2. TCP 端口: [合并 IPv4+IPv6] $TCP_ALL"
+
+    # UDP 端口
+    UDP4=(); UDP6=()
+    [ $IPV4 -eq 1 ] && UDP4=($(iptables -S INPUT | grep "\-p udp" | grep -- '--dport' | awk -F'--dport ' '{print $2}' | awk '{print $1}'))
+    [ $IPV6 -eq 1 ] && UDP6=($(ip6tables -S INPUT | grep "\-p udp" | grep -- '--dport' | awk -F'--dport ' '{print $2}' | awk '{print $1}'))
+    UDP_ALL=$(printf "%s\n" "${UDP4[@]}" "${UDP6[@]}" | sort -n | uniq)
+    echo "3. UDP 端口: [合并 IPv4+IPv6] $UDP_ALL"
+
+    # ICMP 状态
+    echo "4. ICMP 状态:"
+    [ $IPV4 -eq 1 ] && iptables -S INPUT | grep -q "\-p icmp" && echo "  IPv4: 开启" || echo "  IPv4: 关闭"
+    [ $IPV6 -eq 1 ] && ip6tables -S INPUT | grep -q "\-p ipv6-icmp" && echo "  IPv6: 开启" || echo "  IPv6: 关闭"
+
+    # 出站状态
+    echo "5. 出站状态:"
+    [ $IPV4 -eq 1 ] && iptables -S OUTPUT | grep -q "DROP" && echo "  IPv4: 限制" || echo "  IPv4: 允许"
+    [ $IPV6 -eq 1 ] && ip6tables -S OUTPUT | grep -q "DROP" && echo "  IPv6: 限制" || echo "  IPv6: 允许"
+
+    echo "=============================="
 }
 
-# ===== 批量导入/导出 =====
-import_ports() {
-  ensure_ssh_safe
-  read -r -p "输入文件路径: " file
-  [[ ! -f "$file" ]] && echo -e "${RED}文件不存在${RESET}" && return
-  read -r -p "协议 (tcp/udp): " proto
-  [[ "$proto" != "tcp" && "$proto" != "udp" ]] && echo -e "${RED}协议错误${RESET}" && return
-  while read -r line; do
-    [[ -z "$line" || "$line" =~ ^# ]] && continue
-    normalize_and_validate_ports "$line" || continue
-    allow_tokens "$proto" "${PORT_TOKENS[@]}"
-  done < "$file"
-}
+### 主流程 ###
+check_root
+install_persistent
+init_prot_file
+detect_stack
+get_ssh_port
+create_systemd_timer
 
-export_ports() {
-  ensure_ssh_safe
-  read -r -p "输出文件路径: " outfile
-  echo "# SSH 端口" > "$outfile"
-  ufw status | awk '/ALLOW/ && /\/tcp/ && $1 ~ /^[0-9]+$/ {print $1}' >> "$outfile"
-  echo "# TCP 端口" >> "$outfile"
-  ufw status | awk '/ALLOW/ && /\/tcp/{print $1}' | sed 's#/tcp##' >> "$outfile"
-  echo "# UDP 端口" >> "$outfile"
-  ufw status | awk '/ALLOW/ && /\/udp/{print $1}' | sed 's#/udp##' >> "$outfile"
-  echo "# ICMP" >> "$outfile"
-  ufw status | grep -qE "ALLOW IN.*icmp" && echo "允许" >> "$outfile" || echo "未允许" >> "$outfile"
-  echo -e "${GREEN}导出完成：$outfile${RESET}"
-}
-
-# ===== 子菜单 =====
-menu_ssh() { read -r -p "输入要放行的 SSH 端口（空返回）： " p; [[ -n "$p" ]] && normalize_and_validate_ports "$p" && allow_tokens tcp "${PORT_TOKENS[@]}"; pause; }
-menu_tcp() { read -r -p "输入要放行 TCP 端口或范围： " p; [[ -n "$p" ]] && normalize_and_validate_ports "$p" && allow_tokens tcp "${PORT_TOKENS[@]}"; pause; }
-menu_udp() { read -r -p "输入要放行 UDP 端口或范围： " p; [[ -n "$p" ]] && normalize_and_validate_ports "$p" && allow_tokens udp "${PORT_TOKENS[@]}"; pause; }
-menu_icmp() { 
-  if ufw status | grep -qE "ALLOW IN.*icmp"; then
-    echo -e "${YELLOW}ICMP 已放行${RESET}"
-  else
-    ufw allow in proto icmp && echo -e "${GREEN}ICMP 已放行${RESET}"
-  fi
-  pause
-}
-menu_outbound() { read -r -p "允许所有出站？(y/n): " x; [[ "$x" =~ ^[Yy]$ ]] && ufw default allow outgoing || ufw default deny outgoing; pause; }
-
-# ===== 主菜单 =====
-main_menu() {
-  while true; do
-    clear
-    status_summary
-    echo -e "\n${CYAN}${BOLD}—— 防火墙管理菜单 ——${RESET}"
-    echo "1) 入站 SSH"
-    echo "2) 入站 TCP"
-    echo "3) 入站 UDP"
-    echo "4) 入站 ICMP"
-    echo "5) 出站规则"
-    echo "6) 批量导入端口"
-    echo "7) 批量导出端口"
-    echo "0) 退出并应用"
-    read -r -p "选择: " op
-    case "$op" in
-      1) menu_ssh ;;
-      2) menu_tcp ;;
-      3) menu_udp ;;
-      4) menu_icmp ;;
-      5) menu_outbound ;;
-      6) import_ports ;;
-      7) export_ports ;;
-      0) ufw reload; echo -e "${GREEN}防火墙规则已应用${RESET}"; exit 0 ;;
-      *) echo -e "${RED}无效选项${RESET}"; pause ;;
-    esac
-  done
-}
-
-# ===== 初始化 =====
-ensure_ufw
-ensure_ssh_safe
-main_menu
+if prot_modified; then
+    [ $IPV4 -eq 1 ] && generate_ipv4_rules
+    [ $IPV6 -eq 1 ] && generate_ipv6_rules
+    save_persistent_rules
+    update_last_mod
+    show_firewall_summary
+    echo "✅ 防火墙规则已应用并永久保存。SSH端口始终放行。"
+else
+    echo "ℹ️ prot 文件未修改，防火墙规则保持不变。"
+    show_firewall_summary
+fi
