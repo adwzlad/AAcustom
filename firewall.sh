@@ -122,39 +122,12 @@ export_ports() {
 menu_ssh() { read -r -p "输入要放行的 SSH 端口（空返回）： " p; [[ -n "$p" ]] && normalize_and_validate_ports "$p" && allow_tokens tcp "${PORT_TOKENS[@]}"; pause; }
 menu_tcp() { read -r -p "输入要放行 TCP 端口或范围： " p; [[ -n "$p" ]] && normalize_and_validate_ports "$p" && allow_tokens tcp "${PORT_TOKENS[@]}"; pause; }
 menu_udp() { read -r -p "输入要放行 UDP 端口或范围： " p; [[ -n "$p" ]] && normalize_and_validate_ports "$p" && allow_tokens udp "${PORT_TOKENS[@]}"; pause; }
-menu_icmp() { ufw status | grep -qE "ALLOW IN.*icmp" && echo -e "${YELLOW}ICMP 已放行${RESET}" || (ufw allow in proto icmp && echo -e "${GREEN}ICMP 已放行${RESET}"); pause; }
-menu_outbound() { read -r -p "允许所有出站？(y/n): " x; [[ "$x" =~ ^[Yy]$ ]] && ufw default allow outgoing || ufw default deny outgoing; pause; }
-
-# ===== 主菜单 =====
-main_menu() {
-  while true; do
-    clear
-    status_summary
-    echo -e "\n${CYAN}${BOLD}—— 防火墙管理菜单 ——${RESET}"
-    echo "1) 入站 SSH"
-    echo "2) 入站 TCP"
-    echo "3) 入站 UDP"
-    echo "4) 入站 ICMP"
-    echo "5) 出站规则"
-    echo "6) 批量导入端口"
-    echo "7) 批量导出端口"
-    echo "0) 退出并应用"
-    read -r -p "选择: " op
-    case "$op" in
-      1) menu_ssh ;;
-      2) menu_tcp ;;
-      3) menu_udp ;;
-      4) menu_icmp ;;
-      5) menu_outbound ;;
-      6) import_ports ;;
-      7) export_ports ;;
-      0) ufw reload; echo -e "${GREEN}防火墙规则已应用${RESET}"; exit 0 ;;
-      *) echo -e "${RED}无效选项${RESET}"; pause ;;
-    esac
-  done
+menu_icmp() { 
+  if ufw status | grep -qE "ALLOW IN.*icmp"; then
+    echo -e "${YELLOW}ICMP 已放行${RESET}"
+  else
+    ufw allow in proto icmp && echo -e "${GREEN}ICMP 已放行${RESET}"
+  fi
+  pause
 }
-
-# ===== 初始化 =====
-ensure_ufw
-ensure_ssh_safe
-main_menu
+menu_outbound() { read
