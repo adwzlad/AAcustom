@@ -1,5 +1,5 @@
 #!/bin/bash
-# 防火墙交互管理脚本 (Debian/Ubuntu) - 最终增强版
+# 防火墙交互管理脚本 (Debian/Ubuntu) - 完整增强版
 
 # ===== 颜色 =====
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; BOLD="\033[1m"; RESET="\033[0m"
@@ -76,7 +76,7 @@ status_summary() {
 # ===== 放行端口 =====
 allow_tokens() {
   local proto="$1"; shift
-  ensure_ssh_safe  # 每次放行前再次确保 SSH 安全
+  ensure_ssh_safe  # 每次操作前确保 SSH 安全
   for tok in "$@"; do
     if [[ "$tok" =~ : ]]; then
       ufw allow "${tok}/${proto}" && echo -e "${GREEN}放行 ${tok}/${proto}${RESET}"
@@ -88,7 +88,7 @@ allow_tokens() {
 
 # ===== 删除规则 =====
 delete_by_numbered() {
-  ensure_ssh_safe  # 删除规则前确保 SSH 安全
+  ensure_ssh_safe
   ufw status numbered
   read -r -p "输入要删除的编号（可空格分隔）： " ids
   [[ -z "$ids" ]] && echo "未输入编号" && return
@@ -125,19 +125,43 @@ export_ports() {
   echo -e "${GREEN}导出完成：$outfile${RESET}"
 }
 
-# ===== 菜单与子菜单 =====
-# （与之前增强版脚本一致，可调用 allow_tokens/delete_by_numbered/import_ports/export_ports 等）
-# 主菜单选项示例：
-# 1) SSH
-# 2) TCP
-# 3) UDP
-# 4) ICMP
-# 5) 出站
-# 6) 批量导入
-# 7) 批量导出
-# 0) 退出并 ufw reload
+# ===== 子菜单函数 =====
+menu_ssh() { read -r -p "输入要放行的 SSH 端口（空返回）： " p; [[ -n "$p" ]] && normalize_and_validate_ports "$p" && allow_tokens tcp "${PORT_TOKENS[@]}"; pause; }
+menu_tcp() { read -r -p "输入要放行 TCP 端口或范围： " p; [[ -n "$p" ]] && normalize_and_validate_ports "$p" && allow_tokens tcp "${PORT_TOKENS[@]}"; pause; }
+menu_udp() { read -r -p "输入要放行 UDP 端口或范围： " p; [[ -n "$p" ]] && normalize_and_validate_ports "$p" && allow_tokens udp "${PORT_TOKENS[@]}"; pause; }
+menu_icmp() { ufw status | grep -qE "ALLOW IN.*icmp" && echo -e "${YELLOW}ICMP 已放行${RESET}" || (ufw allow proto icmp && echo -e "${GREEN}ICMP 已放行${RESET}"); pause; }
+menu_outbound() { read -r -p "允许所有出站？(y/n): " x; [[ "$x" =~ ^[Yy]$ ]] && ufw default allow outgoing || ufw default deny outgoing; pause; }
+
+# ===== 主菜单 =====
+main_menu() {
+  while true; do
+    clear
+    status_summary
+    echo -e "\n${CYAN}${BOLD}—— 防火墙管理菜单 ——${RESET}"
+    echo "1) 入站 SSH"
+    echo "2) 入站 TCP"
+    echo "3) 入站 UDP"
+    echo "4) 入站 ICMP"
+    echo "5) 出站规则"
+    echo "6) 批量导入端口"
+    echo "7) 批量导出端口"
+    echo "0) 退出并应用"
+    read -r -p "选择: " op
+    case "$op" in
+      1) menu_ssh ;;
+      2) menu_tcp ;;
+      3) menu_udp ;;
+      4) menu_icmp ;;
+      5) menu_outbound ;;
+      6) import_ports ;;
+      7) export_ports ;;
+      0) ufw reload; echo -e "${GREEN}防火墙规则已应用${RESET}"; exit 0 ;;
+      *) echo -e "${RED}无效选项${RESET}"; pause ;;
+    esac
+  done
+}
 
 # ===== 初始化 =====
 ensure_ufw
 ensure_ssh_safe
-main_menu()  # 调用你已有菜单函数即可
+main_menu
