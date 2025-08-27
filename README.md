@@ -42,11 +42,11 @@ bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/fake_cer
 
 防火墙管理firewall-site.sh
 
-curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/firewall.sh -o firewall
+curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/firewall.sh -o firewall.sh
 
-chmod +x firewall
+chmod +x firewall.sh
 
-sudo ./firewall
+sudo ./firewall.sh
 
 UFW防火墙规则配置，并定时每天凌晨 4 点更新关于cloudflare_ip的规则
 
