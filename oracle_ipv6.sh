@@ -1,9 +1,16 @@
 #!/bin/bash
 set -e
 
+# 安装依赖 jq
+if ! command -v jq >/dev/null 2>&1; then
+    echo "[INFO] 安装 jq..."
+    sudo apt update
+    sudo apt install -y jq
+fi
+
 SCRIPT="/usr/local/bin/oci_ipv6_sync.sh"
 
-# 写入脚本
+# 写入自动同步脚本
 cat << 'EOF' > $SCRIPT
 #!/bin/bash
 set -e
@@ -72,4 +79,4 @@ systemctl enable --now oci_ipv6_sync.timer
 # 立即执行一次，确保开机 IPv6 生效
 $SCRIPT
 
-echo "✅ IPv6 自动同步完成（完全忽略 IPv4）"
+echo "✅ IPv6 自动同步完成（完全忽略 IPv4，jq 已自动安装）"
