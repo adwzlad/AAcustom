@@ -1,9 +1,8 @@
 #!/bin/bash
-# 防火墙交互管理脚本 (Debian/Ubuntu) - 最终增强版
+# 防火墙交互管理脚本 - 最终修复版
 
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; BOLD="\033[1m"; RESET="\033[0m"
 
-# Root 校验
 [[ $EUID -ne 0 ]] && echo -e "${RED}请使用 root 用户运行${RESET}" && exit 1
 
 pause() { read -r -p "按回车返回上级菜单..." _; }
