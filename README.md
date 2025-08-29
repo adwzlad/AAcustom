@@ -18,7 +18,7 @@ bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/upgrade-
 
 Oracle自动获取IPV6
 
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/oracle_ipv6.sh)
+/root/oracle_ipv6 && bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/oracle_ipv6.sh)
 
 bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/oracle_ipv6.sh)
 
