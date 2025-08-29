@@ -1,106 +1,82 @@
 #!/bin/bash
+# 自动生成 IPv6 配置脚本，并添加定时任务和开机启动
+# 作者: ChatGPT
 
-# 检查是否以 root 用户运行
-if [[ $EUID -ne 0 ]]; then
-    echo "请以 root 用户运行此脚本。"
+# === 检查 IPv6 文件是否存在 ===
+IPV6_FILE="/root/oracle_ipv6"
+if [[ ! -f "$IPV6_FILE" ]]; then
+    echo "[错误] 未找到 $IPV6_FILE 文件"
     exit 1
 fi
 
-# -------------------------------
-# 创建主脚本
-# -------------------------------
-cat << 'EOF' > /usr/local/bin/ipv6_checker.sh
+IPV6_ADDR=$(cat $IPV6_FILE | head -n 1 | tr -d '[:space:]')
+if [[ -z "$IPV6_ADDR" ]]; then
+    echo "[错误] IPv6 地址为空，请检查 $IPV6_FILE"
+    exit 1
+fi
+
+# === 检测网卡名称 ===
+if ip link show ens3 >/dev/null 2>&1; then
+    NIC="ens3"
+elif ip link show enp0s6 >/dev/null 2>&1; then
+    NIC="enp0s6"
+else
+    echo "[错误] 未找到 ens3 或 enp0s6 网卡"
+    exit 1
+fi
+
+echo "[信息] 检测到网卡: $NIC"
+echo "[信息] 使用 IPv6 地址: $IPV6_ADDR"
+
+# === 生成执行脚本 ===
+AUTO_SCRIPT="/usr/local/bin/auto_ipv6.sh"
+cat > $AUTO_SCRIPT <<EOF
 #!/bin/bash
+# 自动添加 Oracle Cloud IPv6 地址
+IPV6_ADDR="$IPV6_ADDR"
+NIC="$NIC"
 
-# 获取默认网卡名称
-get_default_interface() {
-    ip route | grep default | awk '{print $5}' | head -n 1
-}
-
-# 检测是否有公网 IPv6 地址
-has_public_ipv6() {
-    local interface=$1
-    ip -6 addr show dev "$interface" scope global | grep -q "inet6"
-    return $?
-}
-
-# 获取公网 IPv6 地址
-get_ipv6() {
-    local interface=$1
-    dhclient -6 "$interface"
-}
-
-# 主逻辑
-main() {
-    local interface=$(get_default_interface)
-
-    if [[ -z $interface ]]; then
-        echo "未找到默认网卡，退出。"
-        exit 1
+# 检查 IPv6 是否已存在
+if ! ip -6 addr show dev \$NIC | grep -q "\$IPV6_ADDR"; then
+    echo "[\$(date)] IPv6 地址缺失，正在添加..."
+    ip -6 addr add \$IPV6_ADDR/128 dev \$NIC
+    # 确保默认路由存在
+    if ! ip -6 route show | grep -q "default via"; then
+        GATEWAY="\$(echo \$IPV6_ADDR | sed 's/::[0-9a-fA-F]*\$/::1/')"
+        ip -6 route add default via \$GATEWAY dev \$NIC
     fi
-
-    echo "检测网卡：$interface"
-
-    if ! has_public_ipv6 "$interface"; then
-        echo "未检测到公网 IPv6，尝试获取..."
-        get_ipv6 "$interface"
-
-        if has_public_ipv6 "$interface"; then
-            echo "成功获取公网 IPv6。"
-        else
-            echo "获取公网 IPv6 失败。"
-        fi
-    else
-        echo "公网 IPv6 已存在，无需操作。"
-    fi
-}
-
-main
+else
+    echo "[\$(date)] IPv6 地址已存在，无需处理"
+fi
 EOF
 
-# 设置主脚本可执行权限
-chmod +x /usr/local/bin/ipv6_checker.sh
+chmod +x $AUTO_SCRIPT
+echo "[信息] 已生成 $AUTO_SCRIPT"
 
-# -------------------------------
-# 创建 systemd 服务文件
-# -------------------------------
-cat << 'EOF' > /etc/systemd/system/ipv6_checker.service
+# === 添加开机启动 ===
+SERVICE_FILE="/etc/systemd/system/auto-ipv6.service"
+cat > $SERVICE_FILE <<EOF
 [Unit]
-Description=IPv6 Checker Service
-After=network-online.target
-Wants=network-online.target
+Description=Auto IPv6 Configuration for Oracle Cloud
+After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/ipv6_checker.sh
+ExecStart=$AUTO_SCRIPT
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# -------------------------------
-# 创建 systemd 定时器文件
-# -------------------------------
-cat << 'EOF' > /etc/systemd/system/ipv6_checker.timer
-[Unit]
-Description=Run IPv6 Checker every 5 minutes
-
-[Timer]
-OnBootSec=1min
-OnUnitActiveSec=5min
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
-# -------------------------------
-# 启用并启动服务和定时器
-# -------------------------------
 systemctl daemon-reload
-systemctl enable ipv6_checker.service
-systemctl enable ipv6_checker.timer
-systemctl start ipv6_checker.timer
+systemctl enable auto-ipv6.service
 
-echo "IPv6 检测和获取功能已成功配置！"
-echo "系统将在开机时和每 5 分钟自动检查并获取公网 IPv6 地址。"
+echo "[信息] 已创建 systemd 服务：auto-ipv6.service"
+
+# === 添加 5 分钟定时检查 ===
+CRON_CMD="*/5 * * * * $AUTO_SCRIPT >> /var/log/auto_ipv6.log 2>&1"
+(crontab -l 2>/dev/null | grep -v "$AUTO_SCRIPT"; echo "$CRON_CMD") | crontab -
+
+echo "[信息] 已添加 cron 任务，每 5 分钟检查一次 IPv6"
+
+echo "[完成] 现在执行：sudo systemctl start auto-ipv6.service"
