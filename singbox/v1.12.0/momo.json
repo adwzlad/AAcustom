@@ -28,7 +28,7 @@
       {"clash_mode": "direct", "server": "local"},
       {"clash_mode": "global", "server": "fakeip"},
       {"domain_suffix": ["services.googleapis.cn", "googleapis.cn", "xn--ngstr-lra8j.com"], "server": "foreign"},
-	  {"domain_suffix": ["dpdns.org"], "outbound": "🎯 全球直连"},
+	  {"domain_suffix": ["dpdns.org"], "server": "public"},
       {"rule_set": ["geosite-cn", "geosite-steamcn"], "server": "public"},
 	  
       {"rule_set": "geosite-ai", "server": "dns-ai"},
