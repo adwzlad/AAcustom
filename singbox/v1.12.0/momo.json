@@ -50,7 +50,8 @@
     ],
     "final": "foreign",
     "strategy": "prefer_ipv6",
-    "independent_cache": true
+    "independent_cache": true,
+    "reverse_mapping": true
   },
   "outbounds": [
     {"tag": "🅾️ AI", "type": "selector", "outbounds": ["🚀 节点选择", "🔯 Oracle自动", "♻️ 非香港自动", "🇺🇸 美国自动", "🇯🇵 日本自动", "🇹🇼 台湾自动", "🇸🇬 新加坡自动", "🇭🇰 香港自动", "🎈 自动选择"]},
