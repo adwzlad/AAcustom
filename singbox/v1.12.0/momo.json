@@ -48,7 +48,7 @@
       {"rule_set": "geosite-proxy", "server": "dns-proxy"},
       {"rule_set": "geosite-!cn", "server": "dns-!cn"}
     ],
-    "final": "🐠 漏网之鱼",
+    "final": "foreign",
     "strategy": "prefer_ipv6",
     "independent_cache": true
   },
