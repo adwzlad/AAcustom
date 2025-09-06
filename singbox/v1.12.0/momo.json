@@ -2,27 +2,27 @@
   "dns": {
     "servers": [
       {"tag": "local", "type": "udp", "server": "223.5.5.5"},
-      {"tag": "public", "type": "https", "server": "https://dns.alidns.com/dns-query", "resolve_server": "local"},
-      {"tag": "wdns", "type": "https", "server": "https://cloudflare-dns.com/dns-query"},
-      {"tag": "foreign", "type": "https", "server": "https://dns.google/dns-query", "resolve_server": "wdns"},
+      {"tag": "public", "type": "https", "server": "https://dns.alidns.com/dns-query", "domain_resolver": "local"},
+      {"tag": "wdns", "type": "https", "server": "https://cloudflare-dns.com/dns-query", "domain_resolver": "public"},
+      {"tag": "foreign", "type": "https", "server": "https://dns.google/dns-query", "domain_resolver": "wdns"},
 
-      {"tag": "dns-ai", "type": "https", "server": "https://dns.google/dns-query", "resolve_server": "foreign", "detour": "🅾️ AI"},
-      {"tag": "dns-youtube", "type": "https", "server": "https://dns.google/dns-query", "resolve_server": "foreign", "detour": "📹 YouTube"},
-      {"tag": "dns-google", "type": "https", "server": "https://dns.google/dns-query", "resolve_server": "foreign", "detour": "🍥 Google"},
-      {"tag": "dns-github", "type": "https", "server": "https://dns.google/dns-query", "resolve_server": "foreign", "detour": "👨‍💻 Github"},
-      {"tag": "dns-X&F", "type": "https", "server": "https://dns.google/dns-query", "resolve_server": "foreign", "detour": "𝕏 X&F"},
-      {"tag": "dns-telegram", "type": "https", "server": "https://dns.google/dns-query", "resolve_server": "foreign", "detour": "📲 Telegram"},
-      {"tag": "dns-tiktok", "type": "https", "server": "https://dns.google/dns-query", "resolve_server": "foreign", "detour": "🎵 TikTok"},
-      {"tag": "dns-tvb", "type": "https", "server": "https://dns.google/dns-query", "resolve_server": "foreign", "detour": "📺️ TVB"},
-      {"tag": "dns-netflix", "type": "https", "server": "https://dns.google/dns-query", "resolve_server": "foreign", "detour": "🎞️ Netflix"},
-      {"tag": "dns-paypal", "type": "https", "server": "https://dns.google/dns-query", "resolve_server": "foreign", "detour": "💶 PayPal"},
-      {"tag": "dns-steam", "type": "https", "server": "https://dns.google/dns-query", "resolve_server": "foreign", "detour": "🎮 Steam"},
-      {"tag": "dns-microsoft", "type": "https", "server": "https://dns.alidns.com/dns-query", "resolve_server": "public", "detour": "Ⓜ️ Microsoft"},
-      {"tag": "dns-onedrive", "type": "https", "server": "https://dns.alidns.com/dns-query", "resolve_server": "public", "detour": "🪟 OneDrive"},
-      {"tag": "dns-apple", "type": "https", "server": "https://dns.alidns.com/dns-query", "resolve_server": "public", "detour": "🍎 Apple"},
-      {"tag": "dns-wechat", "type": "https", "server": "https://dns.alidns.com/dns-query", "resolve_server": "public", "detour": "🤢 WeChat"},
-      {"tag": "dns-proxy", "type": "https", "server": "https://dns.google/dns-query", "resolve_server": "foreign", "detour": "🏴‍☠️ Proxy"},
-      {"tag": "dns-!cn", "type": "https", "server": "https://dns.google/dns-query", "resolve_server": "foreign", "detour": "🚀 节点选择"}
+      {"tag": "dns-ai", "type": "https", "server": "https://dns.google/dns-query", "domain_resolver": "wdns", "detour": "🅾️ AI"},
+      {"tag": "dns-youtube", "type": "https", "server": "https://dns.google/dns-query", "domain_resolver": "wdns", "detour": "📹 YouTube"},
+      {"tag": "dns-google", "type": "https", "server": "https://dns.google/dns-query", "domain_resolver": "wdns", "detour": "🍥 Google"},
+      {"tag": "dns-github", "type": "https", "server": "https://dns.google/dns-query", "domain_resolver": "wdns", "detour": "👨‍💻 Github"},
+      {"tag": "dns-X&F", "type": "https", "server": "https://dns.google/dns-query", "domain_resolver": "wdns", "detour": "𝕏 X&F"},
+      {"tag": "dns-telegram", "type": "https", "server": "https://dns.google/dns-query", "domain_resolver": "wdns", "detour": "📲 Telegram"},
+      {"tag": "dns-tiktok", "type": "https", "server": "https://dns.google/dns-query", "domain_resolver": "wdns", "detour": "🎵 TikTok"},
+      {"tag": "dns-tvb", "type": "https", "server": "https://dns.google/dns-query", "domain_resolver": "wdns", "detour": "📺️ TVB"},
+      {"tag": "dns-netflix", "type": "https", "server": "https://dns.google/dns-query", "domain_resolver": "wdns", "detour": "🎞️ Netflix"},
+      {"tag": "dns-paypal", "type": "https", "server": "https://dns.google/dns-query", "domain_resolver": "wdns", "detour": "💶 PayPal"},
+      {"tag": "dns-steam", "type": "https", "server": "https://dns.google/dns-query", "domain_resolver": "wdns", "detour": "🎮 Steam"},
+      {"tag": "dns-microsoft", "type": "https", "server": "https://dns.alidns.com/dns-query", "domain_resolver": "local", "detour": "Ⓜ️ Microsoft"},
+      {"tag": "dns-onedrive", "type": "https", "server": "https://dns.alidns.com/dns-query", "domain_resolver": "local", "detour": "🪟 OneDrive"},
+      {"tag": "dns-apple", "type": "https", "server": "https://dns.alidns.com/dns-query", "domain_resolver": "local", "detour": "🍎 Apple"},
+      {"tag": "dns-wechat", "type": "https", "server": "https://dns.alidns.com/dns-query", "domain_resolver": "local", "detour": "🤢 WeChat"},
+      {"tag": "dns-proxy", "type": "https", "server": "https://dns.google/dns-query", "domain_resolver": "wdns", "detour": "🏴‍☠️ Proxy"},
+      {"tag": "dns-!cn", "type": "https", "server": "https://dns.google/dns-query", "domain_resolver": "wdns", "detour": "🚀 节点选择"}
     ],
     "rules": [
       {"query_type": "HTTPS", "action": "reject"},
@@ -144,7 +144,7 @@
       {"tag": "geoip-cn", "type": "remote", "format": "binary", "url": "https://file.ghtw.dpdns.org/srs/ip_China-ASN-combined-ip.srs", "download_detour": "🎯 全球直连", "update_interval": "48h"}
     ],
     "final": "🐠 漏网之鱼",
-    "default_resolve_server": {"server": "public"}
+    "default_domain_resolver": {"server": "public"}
   },
   "inbounds": [
     {
