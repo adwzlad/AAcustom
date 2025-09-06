@@ -143,7 +143,7 @@
       {"tag": "geoip-cn", "type": "remote", "format": "binary", "url": "https://gaus.dpdns.org/https://github.com/qljsyph/ruleset-icon/raw/refs/heads/main/sing-box/geoip/China-ASN-combined-ip.srs", "download_detour": "🎯 全球直连", "update_interval": "48h"}
     ],
     "final": "🐠 漏网之鱼",
-    "default_domain_resolver": {"server": "🐠 漏网之鱼"}
+    "default_domain_resolver": {"server": "public"}
   },
   "inbounds": [
     {
