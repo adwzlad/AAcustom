@@ -26,27 +26,27 @@
     ],
     "rules": [
       {"query_type": "HTTPS", "action": "reject"},
-      {"clash_mode": "direct", "server": "public", "server_tag": true},
-      {"clash_mode": "global", "server": "foreign", "server_tag": true},
-      {"rule_set": ["geosite-cn", "geosite-steamcn"], "server": "public", "server_tag": true},
+      {"clash_mode": "direct", "server": "public"},
+      {"clash_mode": "global", "server": "foreign"},
+      {"rule_set": ["geosite-cn", "geosite-steamcn"], "server": "public"},
 	  
-      {"rule_set": "geosite-ai", "server": "dns-ai", "server_tag": true},
-      {"rule_set": "geosite-youtube", "server": "dns-youtube", "server_tag": true},
-      {"rule_set": "geosite-google", "server": "dns-google", "server_tag": true},
-      {"rule_set": "geosite-github", "server": "dns-github", "server_tag": true},
-      {"rule_set": ["geosite-x", "geosite-facebook"], "server": "dns-X&F", "server_tag": true},
-      {"rule_set": "geosite-telegram", "server": "dns-telegram", "server_tag": true},
-      {"rule_set": "geosite-tiktok", "server": "dns-tiktok", "server_tag": true},
-      {"rule_set": "geosite-tvb", "server": "dns-tvb", "server_tag": true},
-      {"rule_set": "geosite-netflix", "server": "dns-netflix", "server_tag": true},
-      {"rule_set": "geosite-paypal", "server": "dns-paypal", "server_tag": true},
-      {"rule_set": "geosite-steam", "server": "dns-steam", "server_tag": true},
-      {"rule_set": "geosite-microsoft", "server": "dns-microsoft", "server_tag": true},
-      {"rule_set": "geosite-onedrive", "server": "dns-onedrive", "server_tag": true},
-      {"rule_set": "geosite-apple", "server": "dns-apple", "server_tag": true},
-      {"rule_set": "geosite-wechat", "server": "dns-wechat", "server_tag": true},
-      {"rule_set": "geosite-proxy", "server": "dns-proxy", "server_tag": true},
-      {"rule_set": "geosite-!cn", "server": "dns-!cn", "server_tag": true}
+      {"rule_set": "geosite-ai", "server": "dns-ai"},
+      {"rule_set": "geosite-youtube", "server": "dns-youtube"},
+      {"rule_set": "geosite-google", "server": "dns-google"},
+      {"rule_set": "geosite-github", "server": "dns-github"},
+      {"rule_set": ["geosite-x", "geosite-facebook"], "server": "dns-X&F"},
+      {"rule_set": "geosite-telegram", "server": "dns-telegram"},
+      {"rule_set": "geosite-tiktok", "server": "dns-tiktok"},
+      {"rule_set": "geosite-tvb", "server": "dns-tvb"},
+      {"rule_set": "geosite-netflix", "server": "dns-netflix"},
+      {"rule_set": "geosite-paypal", "server": "dns-paypal"},
+      {"rule_set": "geosite-steam", "server": "dns-steam"},
+      {"rule_set": "geosite-microsoft", "server": "dns-microsoft"},
+      {"rule_set": "geosite-onedrive", "server": "dns-onedrive"},
+      {"rule_set": "geosite-apple", "server": "dns-apple"},
+      {"rule_set": "geosite-wechat", "server": "dns-wechat"},
+      {"rule_set": "geosite-proxy", "server": "dns-proxy"},
+      {"rule_set": "geosite-!cn", "server": "dns-!cn"}
     ],
     "final": "🐠 漏网之鱼",
     "strategy": "prefer_ipv6",
@@ -143,7 +143,7 @@
       {"tag": "geoip-cn", "type": "remote", "format": "binary", "url": "https://gaus.dpdns.org/https://github.com/qljsyph/ruleset-icon/raw/refs/heads/main/sing-box/geoip/China-ASN-combined-ip.srs", "download_detour": "🎯 全球直连", "update_interval": "48h"}
     ],
     "final": "🐠 漏网之鱼",
-    "default_domain_resolver": {"server": "🐠 漏网之鱼", "server_tag": true}
+    "default_domain_resolver": {"server": "🐠 漏网之鱼"}
   },
   "inbounds": [
     {
