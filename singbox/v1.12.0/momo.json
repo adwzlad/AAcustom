@@ -25,7 +25,7 @@
     "rules": [
       {"clash_mode": "direct", "server": "local"},
       {"clash_mode": "global", "server": "fakeip"},
-      {"query_type": "HTTPS", "action": "hijack-dns"},
+      {"query_type": "HTTPS", "action": "reject"},
       {"domain_suffix": ["services.googleapis.cn", "googleapis.cn", "xn--ngstr-lra8j.com"], "server": "dns-!cn"},
       {"rule_set": ["geosite-cn", "geosite-steamcn"], "server": "local"},
 	  
