@@ -2,7 +2,7 @@ Debian/Ubuntu 系统清理
 
 bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/clean-debian.sh)
 
-bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/clean-debian.sh.sh)
+bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/clean-debian.sh)
 
 更换系统语言、修改时区/密码/SSH
 
@@ -33,6 +33,10 @@ bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/nginx-cl
 bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/arm_openresty_cloudflare_ips.sh)
 
 bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/arm_openresty_cloudflare_ips.sh)
+
+飞牛OS系统服务交互可选开关
+
+bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/FnOS.sh)
 
 在指定路径生成伪域名证书
 
