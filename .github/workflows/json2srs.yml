@@ -25,19 +25,30 @@ jobs:
 
       - name: Install sing-box
         run: |
-          TAG=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | jq -r .tag_name)
+          RELEASE_JSON=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest)
+          TAG=$(echo "$RELEASE_JSON" | jq -r .tag_name)
+          echo "Latest tag: $TAG"
 
           ARCH=$(uname -m)
           case "$ARCH" in
-            x86_64) ARCH="linux-amd64" ;;
-            aarch64|arm64) ARCH="linux-arm64" ;;
-            i386|i686) ARCH="linux-386" ;;
-            *) ARCH="linux-amd64" ;;
+            x86_64) KEYWORD="amd64" ;;
+            aarch64|arm64) KEYWORD="arm64" ;;
+            i386|i686) KEYWORD="386" ;;
+            *) KEYWORD="amd64" ;;
           esac
 
-          ASSET_NAME="sing-box-${TAG}-${ARCH}.tar.gz"
-          echo "Downloading ${ASSET_NAME} from release ${TAG}"
-          curl -sL "https://github.com/SagerNet/sing-box/releases/download/${TAG}/${ASSET_NAME}" -o sing-box.tar.gz
+          DOWNLOAD_URL=$(echo "$RELEASE_JSON" | jq -r --arg KEYWORD "$KEYWORD" '.assets[] | select(.name | test("linux.*" + $KEYWORD)) | .browser_download_url' | head -n1)
+
+          if [ -z "$DOWNLOAD_URL" ]; then
+            echo "No matching asset found for arch $ARCH"
+            exit 1
+          fi
+
+          echo "Downloading from $DOWNLOAD_URL"
+          curl -sL "$DOWNLOAD_URL" -o sing-box.tar.gz
+
+          ls -lh sing-box.tar.gz
+          file sing-box.tar.gz
 
           tar -xzf sing-box.tar.gz
           sudo mv sing-box*/sing-box /usr/local/bin/
@@ -45,8 +56,6 @@ jobs:
       - name: Find changed JSON files
         id: changes
         run: |
-          # 找到和上一次提交相比有变动的 singbox/*.json
-          git fetch origin main
           CHANGED=$(git diff --name-only HEAD~1 HEAD | grep '^singbox/.*\.json$' || true)
           echo "changed=$CHANGED" >> $GITHUB_OUTPUT
 
