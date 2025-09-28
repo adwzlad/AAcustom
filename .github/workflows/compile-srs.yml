@@ -16,9 +16,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install jq
-        run: sudo apt update && sudo apt install -y jq
-
       - name: Get latest sing-box version
         id: get_version
         run: |
@@ -35,7 +32,7 @@ jobs:
           sudo mv sing-box-*/sing-box /usr/local/bin/
           sing-box -h
 
-      - name: Validate JSON and Compile to SRS
+      - name: Compile JSON to SRS
         run: |
           shopt -s nullglob
           echo "JSON files in singbox/v1.12.0/:"
@@ -44,8 +41,12 @@ jobs:
           for f in singbox/v1.12.0/*.json; do
               name=$(basename "$f" .json)
 
+              # Remove BOM if exists
+              sed -i '1s/^\xEF\xBB\xBF//' "$f"
+
               # Validate JSON structure
               version=$(jq -r '.version // empty' "$f")
+              echo "DEBUG: $f version=$version"
               if [ "$version" != "1" ]; then
                   echo "❌ $f missing top-level \"version\": 1"
                   exit 1
