@@ -1,12 +1,12 @@
 name: Convert JSON to SRS
 
 on:
-  workflow_dispatch:   # 手动触发
+  workflow_dispatch:
   push:
     paths:
-      - "singbox/*"      # 仅 singbox 目录下的文件（不含子目录）
+      - "singbox/*"
   schedule:
-    - cron: "0 4 * * *"  # 每天 04:00 UTC 自动运行（北京时间中午 12:00）
+    - cron: "0 4 * * *"  # 每天 04:00 UTC 自动运行
 
 jobs:
   build:
@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # 需要完整 git 历史来做 diff
+          fetch-depth: 0
 
       - name: Install dependencies
         run: |
@@ -47,9 +47,6 @@ jobs:
           echo "Downloading from $DOWNLOAD_URL"
           curl -sL "$DOWNLOAD_URL" -o sing-box.tar.gz
 
-          ls -lh sing-box.tar.gz
-          file sing-box.tar.gz
-
           tar -xzf sing-box.tar.gz
           sudo mv sing-box*/sing-box /usr/local/bin/
 
@@ -60,9 +57,15 @@ jobs:
           echo "changed=$CHANGED" >> $GITHUB_OUTPUT
 
       - name: Convert JSON -> SRS
-        if: steps.changes.outputs.changed != ''
         run: |
-          for file in ${{ steps.changes.outputs.changed }}; do
+          if [ -z "${{ steps.changes.outputs.changed }}" ]; then
+            echo "No changed JSON detected, converting all JSON files"
+            FILES=$(ls singbox/*.json 2>/dev/null || true)
+          else
+            FILES=${{ steps.changes.outputs.changed }}
+          fi
+
+          for file in $FILES; do
             [ -f "$file" ] || continue
             out="${file%.json}.srs"
             echo "Converting $file -> $out"
@@ -70,8 +73,8 @@ jobs:
           done
 
       - name: Commit converted files
-        if: steps.changes.outputs.changed != ''
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "Auto convert updated JSON rules to SRS"
-          file_pattern: singbox/*.srs
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add singbox/*.srs
+          git diff --quiet && echo "No changes to commit" || git commit -m "Auto convert JSON rules to SRS" && git push
