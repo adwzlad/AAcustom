@@ -23,17 +23,10 @@ jobs:
           echo "LATEST_VERSION=$LATEST" >> $GITHUB_ENV
           echo "DEBUG: LATEST_VERSION=$LATEST"
 
-      - name: Install Sing-box and tools
+      - name: Install required tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y dos2unix jq iconv
-          
-          VERSION="${LATEST_VERSION#v}"
-          echo "Downloading sing-box $LATEST_VERSION"
-          curl -fsSL "https://github.com/SagerNet/sing-box/releases/download/$LATEST_VERSION/sing-box-$VERSION-linux-amd64.tar.gz" -o sing-box.tar.gz
-          tar -xzf sing-box.tar.gz
-          sudo mv sing-box-*/sing-box /usr/local/bin/
-          sing-box -h
+          sudo apt-get install -y dos2unix jq
 
       - name: Clean, validate JSON and compile to SRS
         run: |
@@ -44,13 +37,13 @@ jobs:
           for f in singbox/*.json; do
               name=$(basename "$f" .json)
 
-              # Remove BOM if exists
+              # Remove BOM
               sed -i '1s/^\xEF\xBB\xBF//' "$f"
-              # Convert CRLF to LF
+
+              # Convert CRLF → LF
               dos2unix "$f"
-              # Remove non-printable chars
-              tr -cd '\11\12\15\40-\176' < "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-              # Convert ANSI/GBK to UTF-8
+
+              # Convert ANSI / other encodings → UTF-8
               iconv -f CP1252 -t UTF-8 "$f" -o "$f.utf8" && mv "$f.utf8" "$f"
 
               # Validate JSON
@@ -59,6 +52,7 @@ jobs:
                   exit 1
               fi
 
+              # Validate version
               version=$(jq -r '.version // empty' "$f")
               echo "DEBUG: $f version=$version"
               if [ "$version" != "1" ]; then
@@ -66,6 +60,7 @@ jobs:
                   exit 1
               fi
 
+              # Validate type
               missing_type=$(jq -r '.rules[] | select(.type? == null) | @text' "$f")
               if [ -n "$missing_type" ]; then
                   echo "❌ $f has rule(s) missing \"type\" field"
