@@ -16,6 +16,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install jq
+        run: sudo apt update && sudo apt install -y jq
+
       - name: Get latest sing-box version
         id: get_version
         run: |
@@ -30,19 +33,34 @@ jobs:
           curl -fsSL "https://github.com/SagerNet/sing-box/releases/download/$LATEST_VERSION/sing-box-$VERSION-linux-amd64.tar.gz" -o sing-box.tar.gz
           tar -xzf sing-box.tar.gz
           sudo mv sing-box-*/sing-box /usr/local/bin/
-          sing-box version
+          sing-box -h
 
-      - name: Compile JSON to SRS
+      - name: Validate JSON and Compile to SRS
         run: |
           shopt -s nullglob
           echo "JSON files in singbox/v1.12.0/:"
           ls -lh singbox/v1.12.0/
+
           for f in singbox/v1.12.0/*.json; do
-            name=$(basename "$f" .json)
-            echo "Compiling $f -> singbox/v1.12.0/$name.srs"
-            # 使用 --version 参数指定版本，保证兼容最新 sing-box
-            sing-box rule-set compile "$f" --version 1 -o "singbox/v1.12.0/$name.srs"
+              name=$(basename "$f" .json)
+
+              # Validate JSON structure
+              version=$(jq -r '.version // empty' "$f")
+              if [ "$version" != "1" ]; then
+                  echo "❌ $f missing top-level \"version\": 1"
+                  exit 1
+              fi
+
+              missing_type=$(jq -r '.rules[] | select(.type? == null) | @text' "$f")
+              if [ -n "$missing_type" ]; then
+                  echo "❌ $f has rule(s) missing \"type\" field"
+                  exit 1
+              fi
+
+              echo "✅ $f validated, compiling to singbox/v1.12.0/$name.srs"
+              sing-box rule-set compile "$f" -o "singbox/v1.12.0/$name.srs"
           done
+
           echo "Generated SRS files:"
           ls -lh singbox/v1.12.0/*.srs
 
