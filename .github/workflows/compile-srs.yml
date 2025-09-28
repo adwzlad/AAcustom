@@ -23,6 +23,11 @@ jobs:
           echo "LATEST_VERSION=$LATEST" >> $GITHUB_ENV
           echo "DEBUG: LATEST_VERSION=$LATEST"
 
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dos2unix jq
+
       - name: Install Sing-box
         run: |
           VERSION="${LATEST_VERSION#v}"
@@ -41,10 +46,11 @@ jobs:
           for f in singbox/v1.12.0/*.json; do
               name=$(basename "$f" .json)
 
-              # Remove BOM and convert CRLF to LF
-              awk 'NR==1{sub(/^\xef\xbb\xbf/,"")}{gsub("\r$",""); print}' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+              # 1️⃣ 强制 UTF-8 无 BOM + LF
+              iconv -f UTF-8 -t UTF-8 -c "$f" -o "$f.tmp" && mv "$f.tmp" "$f"
+              dos2unix "$f"
 
-              # Validate JSON structure
+              # 2️⃣ 校验 JSON version
               version=$(jq -r '.version // empty' "$f")
               echo "DEBUG: $f version=$version"
               if [ "$version" != "1" ]; then
@@ -52,12 +58,14 @@ jobs:
                   exit 1
               fi
 
+              # 3️⃣ 校验 rules type
               missing_type=$(jq -r '.rules[] | select(.type? == null) | @text' "$f")
               if [ -n "$missing_type" ]; then
                   echo "❌ $f has rule(s) missing \"type\" field"
                   exit 1
               fi
 
+              # 4️⃣ 编译 SRS
               echo "✅ $f validated, compiling to singbox/v1.12.0/$name.srs"
               sing-box rule-set compile "$f" -o "singbox/v1.12.0/$name.srs"
           done
