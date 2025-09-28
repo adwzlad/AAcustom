@@ -1,0 +1,36 @@
+name: Convert JSON to SRS
+
+on:
+  workflow_dispatch:   # 手动触发
+  push:
+    paths:
+      - "singbox/*"      # 仅 singbox 目录下的文件（不含子目录）
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install sing-box
+        run: |
+          wget https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-$(uname -m)-linux.tar.gz -O sing-box.tar.gz
+          tar -xzf sing-box.tar.gz
+          sudo mv sing-box*/sing-box /usr/local/bin/
+
+      - name: Convert JSON -> SRS
+        run: |
+          for file in singbox/*.json; do
+            [ -f "$file" ] || continue
+            out="${file%.json}.srs"
+            echo "Converting $file -> $out"
+            sing-box rule-set compile --output "$out" "$file"
+          done
+
+      - name: Commit converted files
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Auto convert JSON rules to SRS"
+          file_pattern: singbox/*.srs
