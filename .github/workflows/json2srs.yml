@@ -5,6 +5,8 @@ on:
   push:
     paths:
       - "singbox/*"      # 仅 singbox 目录下的文件（不含子目录）
+  schedule:
+    - cron: "0 4 * * *"  # 每天 04:00 UTC 自动运行（北京时间中午 12:00）
 
 jobs:
   build:
@@ -13,16 +15,45 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 需要完整 git 历史来做 diff
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl jq
 
       - name: Install sing-box
         run: |
-          wget https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-$(uname -m)-linux.tar.gz -O sing-box.tar.gz
+          TAG=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | jq -r .tag_name)
+
+          ARCH=$(uname -m)
+          case "$ARCH" in
+            x86_64) ARCH="linux-amd64" ;;
+            aarch64|arm64) ARCH="linux-arm64" ;;
+            i386|i686) ARCH="linux-386" ;;
+            *) ARCH="linux-amd64" ;;
+          esac
+
+          ASSET_NAME="sing-box-${TAG}-${ARCH}.tar.gz"
+          echo "Downloading ${ASSET_NAME} from release ${TAG}"
+          curl -sL "https://github.com/SagerNet/sing-box/releases/download/${TAG}/${ASSET_NAME}" -o sing-box.tar.gz
+
           tar -xzf sing-box.tar.gz
           sudo mv sing-box*/sing-box /usr/local/bin/
 
-      - name: Convert JSON -> SRS
+      - name: Find changed JSON files
+        id: changes
         run: |
-          for file in singbox/*.json; do
+          # 找到和上一次提交相比有变动的 singbox/*.json
+          git fetch origin main
+          CHANGED=$(git diff --name-only HEAD~1 HEAD | grep '^singbox/.*\.json$' || true)
+          echo "changed=$CHANGED" >> $GITHUB_OUTPUT
+
+      - name: Convert JSON -> SRS
+        if: steps.changes.outputs.changed != ''
+        run: |
+          for file in ${{ steps.changes.outputs.changed }}; do
             [ -f "$file" ] || continue
             out="${file%.json}.srs"
             echo "Converting $file -> $out"
@@ -30,7 +61,8 @@ jobs:
           done
 
       - name: Commit converted files
+        if: steps.changes.outputs.changed != ''
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Auto convert JSON rules to SRS"
+          commit_message: "Auto convert updated JSON rules to SRS"
           file_pattern: singbox/*.srs
