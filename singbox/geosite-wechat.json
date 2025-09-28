@@ -2,7 +2,6 @@
   "version": 1,
   "rules": [
     {
-      "type": "domain",
       "domain": [
         "dl.wechat.com",
         "sgfindershort.wechat.com",
@@ -27,7 +26,6 @@
       ]
     },
     {
-      "type": "domain",
       "domain_suffix": [
         ".qlogo.cn",
         ".qpic.cn",
