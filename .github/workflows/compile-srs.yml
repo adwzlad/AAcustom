@@ -21,23 +21,27 @@ jobs:
         run: |
           LATEST=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | grep tag_name | cut -d '"' -f4)
           echo "LATEST_VERSION=$LATEST" >> $GITHUB_ENV
+          echo "DEBUG: LATEST_VERSION=$LATEST"
 
       - name: Install Sing-box
         run: |
-          echo "Downloading sing-box $LATEST_VERSION"
           VERSION="${LATEST_VERSION#v}"
+          echo "Downloading sing-box $LATEST_VERSION"
           curl -fsSL "https://github.com/SagerNet/sing-box/releases/download/$LATEST_VERSION/sing-box-$VERSION-linux-amd64.tar.gz" -o sing-box.tar.gz
           tar -xzf sing-box.tar.gz
           sudo mv sing-box-*/sing-box /usr/local/bin/
+          sing-box -h
 
       - name: Compile JSON to SRS
         run: |
           shopt -s nullglob
+          ls -lh singbox/v1.12.0/
           for f in singbox/v1.12.0/*.json; do
             name=$(basename "$f" .json)
             echo "Compiling $f -> singbox/v1.12.0/$name.srs"
-            sing-box rule-set compile "$f" "singbox/v1.12.0/$name.srs"
+            sing-box rule-set compile "$f" -o "singbox/v1.12.0/$name.srs"
           done
+          ls -lh singbox/v1.12.0/*.srs
 
       - name: Commit and push SRS files
         run: |
