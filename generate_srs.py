@@ -2,7 +2,7 @@
 import os
 import json
 
-TARGET_DIR = "singbox/v1.12.0"
+TARGET_DIR = "singbox"
 
 def generate_srs_file(json_data):
     # TODO: 在这里实现将 JSON 数据转换为 SRS 格式的逻辑
