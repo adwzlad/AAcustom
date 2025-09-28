@@ -1,0 +1,88 @@
+name: Compile JSON to SRS
+
+on:
+  push:
+    paths:
+      - "singbox/*.json"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get latest sing-box version
+        id: get_version
+        run: |
+          LATEST=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | grep tag_name | cut -d '"' -f4)
+          echo "LATEST_VERSION=$LATEST" >> $GITHUB_ENV
+          echo "DEBUG: LATEST_VERSION=$LATEST"
+
+      - name: Install Sing-box and tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dos2unix jq iconv
+          
+          VERSION="${LATEST_VERSION#v}"
+          echo "Downloading sing-box $LATEST_VERSION"
+          curl -fsSL "https://github.com/SagerNet/sing-box/releases/download/$LATEST_VERSION/sing-box-$VERSION-linux-amd64.tar.gz" -o sing-box.tar.gz
+          tar -xzf sing-box.tar.gz
+          sudo mv sing-box-*/sing-box /usr/local/bin/
+          sing-box -h
+
+      - name: Clean, validate JSON and compile to SRS
+        run: |
+          shopt -s nullglob
+          echo "JSON files in singbox/:"
+          ls -lh singbox/
+
+          for f in singbox/*.json; do
+              name=$(basename "$f" .json)
+
+              # Remove BOM if exists
+              sed -i '1s/^\xEF\xBB\xBF//' "$f"
+              # Convert CRLF to LF
+              dos2unix "$f"
+              # Remove non-printable chars
+              tr -cd '\11\12\15\40-\176' < "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+              # Convert ANSI/GBK to UTF-8
+              iconv -f CP1252 -t UTF-8 "$f" -o "$f.utf8" && mv "$f.utf8" "$f"
+
+              # Validate JSON
+              if ! jq empty "$f"; then
+                  echo "❌ $f is invalid JSON"
+                  exit 1
+              fi
+
+              version=$(jq -r '.version // empty' "$f")
+              echo "DEBUG: $f version=$version"
+              if [ "$version" != "1" ]; then
+                  echo "❌ $f missing top-level \"version\": 1"
+                  exit 1
+              fi
+
+              missing_type=$(jq -r '.rules[] | select(.type? == null) | @text' "$f")
+              if [ -n "$missing_type" ]; then
+                  echo "❌ $f has rule(s) missing \"type\" field"
+                  exit 1
+              fi
+
+              echo "✅ $f validated, compiling to singbox/$name.srs"
+              sing-box rule-set compile "$f" -o "singbox/$name.srs"
+          done
+
+          echo "Generated SRS files:"
+          ls -lh singbox/*.srs
+
+      - name: Commit and push SRS files
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add singbox/*.srs
+          git commit -m "Auto compile SRS from JSON (sing-box $LATEST_VERSION) [skip ci]" || echo "No changes to commit"
+          git push
