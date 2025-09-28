@@ -1,17 +1,16 @@
-```yaml
 name: Compile JSON to SRS
 
 on:
   push:
     paths:
-      - "singbox/v1.12.0/*.json"   # 👈 监控这个路径下的 json 文件
-  workflow_dispatch:               # 支持手动触发
+      - "singbox/v1.12.0/*.json"
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # 👈 允许提交回仓库
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -26,7 +25,8 @@ jobs:
       - name: Install Sing-box
         run: |
           echo "Downloading sing-box $LATEST_VERSION"
-          curl -fsSL "https://github.com/SagerNet/sing-box/releases/download/$LATEST_VERSION/sing-box-${LATEST_VERSION#v}-linux-amd64.tar.gz" -o sing-box.tar.gz
+          VERSION="${LATEST_VERSION#v}"
+          curl -fsSL "https://github.com/SagerNet/sing-box/releases/download/$LATEST_VERSION/sing-box-$VERSION-linux-amd64.tar.gz" -o sing-box.tar.gz
           tar -xzf sing-box.tar.gz
           sudo mv sing-box-*/sing-box /usr/local/bin/
 
@@ -46,4 +46,3 @@ jobs:
           git add singbox/v1.12.0/*.srs
           git commit -m "Auto compile SRS from JSON (sing-box $LATEST_VERSION) [skip ci]" || echo "No changes to commit"
           git push
-```
