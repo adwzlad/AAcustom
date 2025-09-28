@@ -1,4 +1,4 @@
-name: Compile JSON to SRS
+name: JSON to SRS
 
 on:
   push:
@@ -23,10 +23,17 @@ jobs:
           echo "LATEST_VERSION=$LATEST" >> $GITHUB_ENV
           echo "DEBUG: LATEST_VERSION=$LATEST"
 
-      - name: Install required tools
+      - name: Install Sing-box
         run: |
           sudo apt-get update
-          sudo apt-get install -y dos2unix jq
+          sudo apt-get install -y curl tar jq dos2unix
+          VERSION="${LATEST_VERSION#v}"
+          echo "Downloading sing-box $LATEST_VERSION"
+          curl -fsSL "https://github.com/SagerNet/sing-box/releases/download/$LATEST_VERSION/sing-box-$VERSION-linux-amd64.tar.gz" -o sing-box.tar.gz
+          tar -xzf sing-box.tar.gz
+          sudo mv sing-box-*/sing-box /usr/local/bin/
+          sudo chmod +x /usr/local/bin/sing-box
+          sing-box -h
 
       - name: Clean, validate JSON and compile to SRS
         run: |
@@ -39,12 +46,10 @@ jobs:
 
               # Remove BOM
               sed -i '1s/^\xEF\xBB\xBF//' "$f"
-
-              # Convert CRLF → LF
+              # Convert CRLF to LF
               dos2unix "$f"
-
-              # Convert ANSI / other encodings → UTF-8
-              iconv -f CP1252 -t UTF-8 "$f" -o "$f.utf8" && mv "$f.utf8" "$f"
+              # Remove non-printable chars
+              tr -cd '\11\12\15\40-\176' < "$f" > "$f.tmp" && mv "$f.tmp" "$f"
 
               # Validate JSON
               if ! jq empty "$f"; then
@@ -52,7 +57,7 @@ jobs:
                   exit 1
               fi
 
-              # Validate version
+              # Check version
               version=$(jq -r '.version // empty' "$f")
               echo "DEBUG: $f version=$version"
               if [ "$version" != "1" ]; then
@@ -60,13 +65,14 @@ jobs:
                   exit 1
               fi
 
-              # Validate type
+              # Check type field
               missing_type=$(jq -r '.rules[] | select(.type? == null) | @text' "$f")
               if [ -n "$missing_type" ]; then
                   echo "❌ $f has rule(s) missing \"type\" field"
                   exit 1
               fi
 
+              # Compile to SRS
               echo "✅ $f validated, compiling to singbox/$name.srs"
               sing-box rule-set compile "$f" -o "singbox/$name.srs"
           done
