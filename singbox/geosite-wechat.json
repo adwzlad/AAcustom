@@ -27,6 +27,7 @@
       ]
     },
     {
+      "type": "domain",
       "domain_suffix": [
         ".qlogo.cn",
         ".qpic.cn",
