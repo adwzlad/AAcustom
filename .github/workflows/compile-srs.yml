@@ -41,8 +41,8 @@ jobs:
           for f in singbox/v1.12.0/*.json; do
               name=$(basename "$f" .json)
 
-              # Remove BOM if exists
-              sed -i '1s/^\xEF\xBB\xBF//' "$f"
+              # Remove BOM and convert CRLF to LF
+              awk 'NR==1{sub(/^\xef\xbb\xbf/,"")}{gsub("\r$",""); print}' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
 
               # Validate JSON structure
               version=$(jq -r '.version // empty' "$f")
