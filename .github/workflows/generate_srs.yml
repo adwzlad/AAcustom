@@ -1,0 +1,63 @@
+name: Auto Generate SRS
+
+# 1. 触发条件设置
+on:
+  push:
+    branches:
+      - main  # 替换成您仓库的主分支名称，例如 master
+    paths:
+      - 'singbox/v1.12.0/**.json' # 仅当此路径下的 JSON 文件有变动时触发
+  workflow_dispatch: # 允许手动运行此工作流
+
+jobs:
+  generate-and-commit:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 检出代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # 必须使用 Personal Access Token (PAT) 或 GITHUB_TOKEN 的替代品
+          # 才能让工作流产生的 commit 再次触发其他工作流（避免无限循环）
+          # 但为了简单，这里先使用默认 GITHUB_TOKEN，并依赖默认的 "push" 触发不触发自身。
+          # 如果提交没有触发新的 workflow，默认 token 即可。
+          # 如果提交需要触发新的 workflow，则需要 PAT。
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 2. 设置运行环境
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      # 安装脚本可能需要的依赖（如果 generate_srs.py 有外部依赖）
+      - name: Install dependencies
+        run: |
+          # 示例：如果您使用 pipenv 或其他工具，请修改此行
+          pip install -r requirements.txt || echo "No requirements.txt found, skipping dependency installation."
+          
+      # 运行生成脚本
+      - name: Run SRS generation script
+        run: python generate_srs.py
+
+      # 3. 检查是否有文件变动（SRS 文件）
+      - name: Check for file changes
+        id: git_status
+        run: |
+          # 检查暂存区和工作目录中是否有未提交的更改
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::set-output name=files_changed::true"
+          else
+            echo "::set-output name=files_changed::false"
+          fi
+        
+      # 4. 提交生成的 SRS 文件
+      - name: Commit generated SRS files
+        if: steps.git_status.outputs.files_changed == 'true'
+        uses: EndBug/add-and-commit@v9
+        with:
+          author_name: GitHub Actions Bot
+          author_email: action@github.com
+          message: 'chore(auto): Auto generate SRS files after JSON change'
+          add: 'singbox/v1.12.0/*.srs' # 仅提交生成的 SRS 文件
