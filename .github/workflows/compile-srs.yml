@@ -30,21 +30,18 @@ jobs:
           curl -fsSL "https://github.com/SagerNet/sing-box/releases/download/$LATEST_VERSION/sing-box-$VERSION-linux-amd64.tar.gz" -o sing-box.tar.gz
           tar -xzf sing-box.tar.gz
           sudo mv sing-box-*/sing-box /usr/local/bin/
-          sing-box -v
+          sing-box version
 
       - name: Compile JSON to SRS
         run: |
           shopt -s nullglob
-          echo "Listing JSON files:"
-          ls -lh singbox/v1.12.0/*.json
+          echo "JSON files in singbox/v1.12.0/:"
+          ls -lh singbox/v1.12.0/
           for f in singbox/v1.12.0/*.json; do
             name=$(basename "$f" .json)
             echo "Compiling $f -> singbox/v1.12.0/$name.srs"
-            if ! sing-box rule-set compile "$f" -o "singbox/v1.12.0/$name.srs"; then
-              echo "ERROR: Failed to compile $f"
-              cat "$f"
-              exit 1
-            fi
+            # 使用 --version 参数指定版本，保证兼容最新 sing-box
+            sing-box rule-set compile "$f" --version 1 -o "singbox/v1.12.0/$name.srs"
           done
           echo "Generated SRS files:"
           ls -lh singbox/v1.12.0/*.srs
