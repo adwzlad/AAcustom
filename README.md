@@ -24,9 +24,9 @@ bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/oracle_i
 
 CF通配符域名证书申请
 
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/SSL_CF_DNS01.sh)
+bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/SSL_CF_DNS.sh)
 
-bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/SSL_CF_DNS01.sh)
+bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/SSL_CF_DNS.sh)
 
 生成/usr/local/openresty/nginx/cloudflare_ips.conf，并定时更新
 
