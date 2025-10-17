@@ -14,7 +14,7 @@ fi
 
 # --------- 交互式输入 ---------
 read -p "请输入 Cloudflare API Token: " CF_Token
-read -p "请输入要签发的主域名 (例如 787612.xyz): " DOMAIN
+read -p "请输入要签发的主域名 (例如 a.com): " DOMAIN
 
 # 设置证书保存目录
 CERT_DIR="/root/cert"
