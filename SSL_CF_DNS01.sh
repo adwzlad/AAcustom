@@ -3,6 +3,7 @@
 # 一键签发 主域名 + *.域名 通配符证书（Cloudflare DNS）
 # 使用 acme.sh + ECC，证书保存到 /root/cert
 # 文件名为 private.key 与 public.crt
+# 自动检测并选择已有 Cloudflare API Token
 # ========================================
 
 if [[ $EUID -ne 0 ]]; then
@@ -10,7 +11,19 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-read -p "请输入 Cloudflare API Token: " CF_Token
+# 检查是否已有 CF_Token
+if [ -n "$CF_Token" ]; then
+  echo "[INFO] 检测到已存在的 Cloudflare API Token: ${CF_Token:0:10}******"
+  read -p "是否使用此 Token？(Y/n): " use_old
+  case "$use_old" in
+    [nN]*) read -p "请输入新的 Cloudflare API Token: " CF_Token ;;
+    *) echo "[INFO] 继续使用现有 Token" ;;
+  esac
+else
+  read -p "请输入 Cloudflare API Token: " CF_Token
+fi
+
+# 输入主域名
 read -p "请输入要签发的主域名 (例如 a.com): " DOMAIN
 
 CERT_DIR="/root/cert"
@@ -29,7 +42,7 @@ fi
 export PATH=$PATH:/root/.acme.sh
 source /root/.bashrc 2>/dev/null || true
 
-# 导出 Cloudflare API Token
+# 导出 Cloudflare Token 环境变量
 export CF_Token="$CF_Token"
 
 echo "[INFO] 开始签发证书 ${DOMAIN} 和 *.${DOMAIN} ..."
@@ -37,9 +50,9 @@ echo "[INFO] 开始签发证书 ${DOMAIN} 和 *.${DOMAIN} ..."
 
 echo "[INFO] 安装证书到 ${CERT_DIR} ..."
 /root/.acme.sh/acme.sh --install-cert -d "${DOMAIN}" \
---key-file "${KEY_PATH}" \
---fullchain-file "${CERT_PATH}" \
---ecc
+  --key-file "${KEY_PATH}" \
+  --fullchain-file "${CERT_PATH}" \
+  --ecc
 
 chmod 600 "${KEY_PATH}" 2>/dev/null
 chmod 644 "${CERT_PATH}" 2>/dev/null
@@ -50,3 +63,5 @@ echo "证书路径: ${CERT_PATH}"
 
 echo "[INFO] 安装自动续签任务..."
 /root/.acme.sh/acme.sh --install-cronjob
+
+echo "[DONE] 全部任务完成！证书将会自动续签。"
