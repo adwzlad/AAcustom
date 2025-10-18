@@ -10,6 +10,8 @@ bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/Debian-Setting.sh)
 
 bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/Debian-Setting.sh)
 
+bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/CentOS-Setting.sh)
+
 适用于从 Debian 11 升级到 Debian 12 的一键 .sh 脚本
 
 bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/upgrade-to-debian12.sh)
