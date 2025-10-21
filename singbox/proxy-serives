@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "domain_suffix": [
+        "v2rayssr.com",
+        "ipleak.net",
+        "debian.org",
+        "proxmox.com",
+        "ping0.cc",
+        "ip138.com",
+        "qichiyu.com",
+        "ip2location.io",
+        "ip.sb",
+        "speed.cloudflare.com",
+        "browserleaks.com"
+      ]
+    }
+  ]
+}
