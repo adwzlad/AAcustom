@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "domain_suffix": [
+        "www.gstatic.com",
+        "www.apple.com",
+        "www.msftconnecttest.com",
+        "speed.cloudflare.com",
+        "cachefly.cachefly.net"
+      ]
+    }
+  ]
+}
