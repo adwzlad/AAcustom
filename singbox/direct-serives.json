@@ -3,10 +3,10 @@
   "rules": [
     {
       "domain_suffix": [
-        "www.gstatic.com",
-        "www.apple.com",
-        "www.msftconnecttest.com",
-        "speed.cloudflare.com",
+        "gstatic.com",
+        "apple.com",
+        "msftconnecttest.com",
+        "cloudflare.com",
         "cachefly.cachefly.net"
       ]
     }
