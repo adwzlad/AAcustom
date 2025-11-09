@@ -26,7 +26,7 @@ bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/oracle_i
 
 CF通配符域名证书申请
 
-acme.sh --register-account -m a@b.com
+/root/.acme.sh/acme.sh --register-account -m a@b.com
 
 bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/SSL_CF_DNS.sh)
 
