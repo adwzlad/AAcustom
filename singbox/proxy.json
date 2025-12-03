@@ -3,6 +3,8 @@
   "rules": [
     {
       "domain_suffix": [
+        "fast.com",
+        "speedtest.net",
         "v2rayssr.com",
         "ipinfo.io",
         "ipleak.net",
