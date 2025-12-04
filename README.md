@@ -48,7 +48,7 @@ bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/fake_cert.sh)
 
 bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/fake_cert.sh)
 
-防火墙管理firewall-site.sh
+Debian12 iptables防火墙管理firewall.sh
 
 sudo bash -c "curl -sL https://github.com/adwzlad/AAcustom/raw/main/firewall.sh -o /root/firewall.sh && chmod +x /root/firewall.sh && /root/firewall.sh"
 
