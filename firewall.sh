@@ -1,11 +1,14 @@
 #!/bin/bash
 # firewall.sh - 全自动防火墙脚本（Debian 12）
+# 支持: prot 放行规则 + forward 端口转发 + 自动 SNAT (单网卡) + IPv4/IPv6
 
 WORK_DIR="/root/firewall"
 PROT_FILE="$WORK_DIR/prot"
+FORWARD_FILE="$WORK_DIR/forward"
 IPV4_RULES="$WORK_DIR/ipv4_rules.sh"
 IPV6_RULES="$WORK_DIR/ipv6_rules.sh"
 LAST_MOD_FILE="$WORK_DIR/.prot_last_mod"
+LAST_MOD_FORWARD="$WORK_DIR/.forward_last_mod"
 
 check_root() {
     [ "$EUID" -ne 0 ] && { echo "❌ 请用 root 权限运行"; exit 1; }
@@ -37,6 +40,19 @@ EOF
     fi
 }
 
+init_forward_file() {
+    if [ ! -f "$FORWARD_FILE" ]; then
+        echo "⚠️ 首次运行，生成示例 forward 文件: $FORWARD_FILE"
+        cat > "$FORWARD_FILE" <<EOF
+# 格式: proto:外部端口[-端口]:内网IP:内网端口
+# tcp:5000-5010:192.168.1.100:5000
+# udp:6000:192.168.1.101:6000
+EOF
+        echo "✅ 已生成 forward 文件，请编辑后再次运行脚本"
+        exit 0
+    fi
+}
+
 detect_stack() {
     IPV4=0; IPV6=0
     ip -4 addr show | grep -q "inet " && IPV4=1
@@ -51,23 +67,30 @@ get_ssh_port() {
 }
 
 get_last_mod() {
-    [ ! -f "$LAST_MOD_FILE" ] && echo 0 > "$LAST_MOD_FILE"
-    cat "$LAST_MOD_FILE"
+    [ ! -f "$1" ] && echo 0 > "$1"
+    cat "$1"
 }
 
 update_last_mod() {
-    stat -c %Y "$PROT_FILE" > "$LAST_MOD_FILE"
+    stat -c %Y "$1" > "$2"
 }
 
 prot_modified() {
-    last=$(get_last_mod)
+    last=$(get_last_mod "$LAST_MOD_FILE")
     current=$(stat -c %Y "$PROT_FILE")
+    [ "$current" -gt "$last" ] && return 0 || return 1
+}
+
+forward_modified() {
+    last=$(get_last_mod "$LAST_MOD_FORWARD")
+    current=$(stat -c %Y "$FORWARD_FILE")
     [ "$current" -gt "$last" ] && return 0 || return 1
 }
 
 generate_ipv4_rules() {
     echo "#!/bin/bash" > "$IPV4_RULES"
     echo "iptables -F" >> "$IPV4_RULES"
+    echo "iptables -t nat -F" >> "$IPV4_RULES"
     echo "iptables -P INPUT DROP" >> "$IPV4_RULES"
     echo "iptables -P FORWARD DROP" >> "$IPV4_RULES"
     echo "iptables -P OUTPUT ACCEPT" >> "$IPV4_RULES"
@@ -75,6 +98,7 @@ generate_ipv4_rules() {
     echo "iptables -A INPUT -i lo -j ACCEPT" >> "$IPV4_RULES"
     echo "iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT" >> "$IPV4_RULES"
 
+    # prot 放行规则
     while read -r line; do
         [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
         proto=$(echo "$line" | cut -d: -f1)
@@ -96,6 +120,23 @@ generate_ipv4_rules() {
                 ;;
         esac
     done < "$PROT_FILE"
+
+    # forward 端口转发 + SNAT
+    while read -r line; do
+        [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
+        proto=$(echo "$line" | cut -d: -f1)
+        ext_port=$(echo "$line" | cut -d: -f2)
+        dst_ip=$(echo "$line" | cut -d: -f3)
+        dst_port=$(echo "$line" | cut -d: -f4)
+        for p in $(seq $(echo $ext_port | cut -d'-' -f1) $(echo $ext_port | cut -s -d'-' -f2)); do
+            echo "iptables -t nat -A PREROUTING -p $proto --dport $p -j DNAT --to-destination $dst_ip:$dst_port" >> "$IPV4_RULES"
+            echo "iptables -A FORWARD -p $proto -d $dst_ip --dport $dst_port -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT" >> "$IPV4_RULES"
+        done
+    done < "$FORWARD_FILE"
+
+    # 自动 SNAT (MASQUERADE) 用于内网回程
+    LAN_IF=$(ip route | grep default | awk '{print $5}' | head -n1)
+    echo "iptables -t nat -A POSTROUTING -o $LAN_IF -j MASQUERADE" >> "$IPV4_RULES"
 
     chmod +x "$IPV4_RULES"
     "$IPV4_RULES"
@@ -182,30 +223,24 @@ EOF
 show_firewall_summary() {
     echo "===== 当前防火墙规则汇总 ====="
     echo "IPv4 支持: $([ $IPV4 -eq 1 ] && echo true || echo false) | IPv6 支持: $([ $IPV6 -eq 1 ] && echo true || echo false)"
-
-    # SSH 端口
     echo "1. SSH 端口: $SSH_PORT"
 
-    # TCP 端口
     TCP4=(); TCP6=()
     [ $IPV4 -eq 1 ] && TCP4=($(iptables -S INPUT | grep "\-p tcp" | grep -- '--dport' | awk -F'--dport ' '{print $2}' | awk '{print $1}'))
     [ $IPV6 -eq 1 ] && TCP6=($(ip6tables -S INPUT | grep "\-p tcp" | grep -- '--dport' | awk -F'--dport ' '{print $2}' | awk '{print $1}'))
     TCP_ALL=$(printf "%s\n" "${TCP4[@]}" "${TCP6[@]}" | sort -n | uniq)
     echo "2. TCP 端口: [合并 IPv4+IPv6] $TCP_ALL"
 
-    # UDP 端口
     UDP4=(); UDP6=()
     [ $IPV4 -eq 1 ] && UDP4=($(iptables -S INPUT | grep "\-p udp" | grep -- '--dport' | awk -F'--dport ' '{print $2}' | awk '{print $1}'))
     [ $IPV6 -eq 1 ] && UDP6=($(ip6tables -S INPUT | grep "\-p udp" | grep -- '--dport' | awk -F'--dport ' '{print $2}' | awk '{print $1}'))
     UDP_ALL=$(printf "%s\n" "${UDP4[@]}" "${UDP6[@]}" | sort -n | uniq)
     echo "3. UDP 端口: [合并 IPv4+IPv6] $UDP_ALL"
 
-    # ICMP 状态
     echo "4. ICMP 状态:"
     [ $IPV4 -eq 1 ] && iptables -S INPUT | grep -q "\-p icmp" && echo "  IPv4: 开启" || echo "  IPv4: 关闭"
     [ $IPV6 -eq 1 ] && ip6tables -S INPUT | grep -q "\-p ipv6-icmp" && echo "  IPv6: 开启" || echo "  IPv6: 关闭"
 
-    # 出站状态
     echo "5. 出站状态:"
     [ $IPV4 -eq 1 ] && iptables -S OUTPUT | grep -q "DROP" && echo "  IPv4: 限制" || echo "  IPv4: 允许"
     [ $IPV6 -eq 1 ] && ip6tables -S OUTPUT | grep -q "DROP" && echo "  IPv6: 限制" || echo "  IPv6: 允许"
@@ -217,18 +252,26 @@ show_firewall_summary() {
 check_root
 install_persistent
 init_prot_file
+init_forward_file
 detect_stack
 get_ssh_port
 create_systemd_timer
 
+APPLY=0
 if prot_modified; then
     [ $IPV4 -eq 1 ] && generate_ipv4_rules
     [ $IPV6 -eq 1 ] && generate_ipv6_rules
-    save_persistent_rules
-    update_last_mod
-    show_firewall_summary
-    echo "✅ 防火墙规则已应用并永久保存。SSH端口始终放行。"
-else
-    echo "ℹ️ prot 文件未修改，防火墙规则保持不变。"
-    show_firewall_summary
+    update_last_mod "$PROT_FILE" "$LAST_MOD_FILE"
+    APPLY=1
 fi
+
+if forward_modified; then
+    [ $IPV4 -eq 1 ] && generate_ipv4_rules
+    update_last_mod "$FORWARD_FILE" "$LAST_MOD_FORWARD"
+    APPLY=1
+fi
+
+[ $APPLY -eq 1 ] && save_persistent_rules
+
+show_firewall_summary
+[ $APPLY -eq 1 ] && echo "✅ 防火墙规则已应用并永久保存。SSH端口始终放行。" || echo "ℹ️ 规则未修改，保持不变。"
