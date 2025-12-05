@@ -48,6 +48,10 @@ bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/fake_cert.sh)
 
 bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/fake_cert.sh)
 
+Debian12 nftables防火墙管理nftables.sh
+
+bash -c "curl -sL https://github.com/adwzlad/AAcustom/raw/main/nftables.sh -o /root/nftables.sh && chmod +x /root/nftables.sh && /root/nftables.sh"
+
 Debian12 iptables防火墙管理firewall.sh
 
 sudo bash -c "curl -sL https://github.com/adwzlad/AAcustom/raw/main/firewall.sh -o /root/firewall.sh && chmod +x /root/firewall.sh && /root/firewall.sh"
