@@ -1,5 +1,5 @@
 #!/bin/bash
-# nftables.sh - 自动管理 nftables 防火墙与端口重定向（Debian 12+）
+# nftables.sh - 自动管理 nftables 防火墙与端口重定向（IPv4+IPv6）
 
 WORK_DIR="/root/nftables"
 PROT_FILE="$WORK_DIR/prot"
@@ -60,10 +60,11 @@ get_ssh_port() {
 }
 
 merge_ports() {
-    ports=($(printf "%s\n" "$@" | sort -n))
+    ports=($(printf "%s\n" "$@" | sort -n | uniq))
     result=""
     start=""
     prev=""
+
     for p in "${ports[@]}"; do
         if [ -z "$start" ]; then
             start=$p
@@ -82,6 +83,7 @@ merge_ports() {
             prev=$p
         fi
     done
+
     if [ -n "$start" ]; then
         if [ "$start" -eq "$prev" ]; then
             result+="$start"
@@ -95,14 +97,19 @@ merge_ports() {
 apply_nftables() {
     echo "生成 nftables 配置文件: $NFT_FILE"
 
+    # 清空并写入新配置
     echo "flush ruleset" > "$NFT_FILE"
+
+    ###########################################
+    # 统一 IPv4 + IPv6 的 inet 表 filter
+    ###########################################
     echo "table inet filter {" >> "$NFT_FILE"
-    echo "    chain input {" >> "$NFT_FILE"
-    echo "        type filter hook input priority 0;" >> "$NFT_FILE"
-    echo "        policy drop;" >> "$NFT_FILE"
-    echo "        iif lo accept" >> "$NFT_FILE"
-    echo "        ct state established,related accept" >> "$NFT_FILE"
-    echo "        tcp dport $SSH_PORT accept" >> "$NFT_FILE"
+    echo "  chain input {" >> "$NFT_FILE"
+    echo "    type filter hook input priority 0;" >> "$NFT_FILE"
+    echo "    policy drop;" >> "$NFT_FILE"
+    echo "    iif lo accept" >> "$NFT_FILE"
+    echo "    ct state established,related accept" >> "$NFT_FILE"
+    echo "    tcp dport $SSH_PORT accept" >> "$NFT_FILE"
 
     TCP_PORTS=($SSH_PORT)
     UDP_PORTS=()
@@ -111,68 +118,78 @@ apply_nftables() {
         [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
         proto=$(echo "$line" | cut -d: -f1)
         ports=$(echo "$line" | cut -d: -f2- | tr -d ' ')
+
         case "$proto" in
             tcp)
                 for p in $(echo "$ports" | tr ',' ' '); do
                     [[ "$p" == "$SSH_PORT" ]] && continue
-                    echo "        tcp dport $p accept" >> "$NFT_FILE"
+                    echo "    tcp dport $p accept" >> "$NFT_FILE"
                     TCP_PORTS+=($p)
                 done
                 ;;
+
             udp)
                 for p in $(echo "$ports" | tr ',' ' '); do
+                    echo "    udp dport $p accept" >> "$NFT_FILE"
                     if [[ $p =~ - ]]; then
-                        echo "        udp dport $p accept" >> "$NFT_FILE"
-                        # 自动展开放行端口段
                         start=$(echo $p | cut -d- -f1)
                         end=$(echo $p | cut -d- -f2)
                         for ((i=start;i<=end;i++)); do UDP_PORTS+=($i); done
                     else
-                        echo "        udp dport $p accept" >> "$NFT_FILE"
                         UDP_PORTS+=($p)
                     fi
                 done
                 ;;
+
             icmp)
-                echo "        icmp type echo-request accept" >> "$NFT_FILE"
+                echo "    icmp type echo-request accept" >> "$NFT_FILE"
+                echo "    icmpv6 type echo-request accept" >> "$NFT_FILE"
                 ;;
         esac
     done < "$PROT_FILE"
 
-    echo "    }" >> "$NFT_FILE"
+    echo "  }" >> "$NFT_FILE"
     echo "}" >> "$NFT_FILE"
 
-    # 端口重定向，仅本机内部
+    ###########################################
+    # NAT（IPv4 + IPv6）重定向
+    ###########################################
+    echo "table inet nat {" >> "$NFT_FILE"
+    echo "  chain prerouting {" >> "$NFT_FILE"
+    echo "    type nat hook prerouting priority 0;" >> "$NFT_FILE"
+
     FORWARD_PORTS=()
+
     while read -r line; do
         [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
         [[ "$line" =~ ^forward: ]] || continue
+
         proto=$(echo "$line" | cut -d: -f2)
         src=$(echo "$line" | cut -d: -f3)
         dst=$(echo "$line" | cut -d: -f4)
-        echo "添加内部端口重定向: $proto $src -> $dst"
-        echo "table inet nat {" >> "$NFT_FILE"
-        echo "    chain prerouting {" >> "$NFT_FILE"
-        echo "        type nat hook prerouting priority 0;" >> "$NFT_FILE"
-        echo "        iif $IFACE $proto dport $src redirect to :$dst" >> "$NFT_FILE"
-        echo "    }" >> "$NFT_FILE"
-        echo "}" >> "$NFT_FILE"
+
+        echo "    $proto dport $src redirect to :$dst" >> "$NFT_FILE"
+
         FORWARD_PORTS+=("$proto:$src:$dst")
-        # 自动把 src 和 dst 加入放行
-        if [[ "$proto" == "udp" ]]; then
+
+        # 自动放行 src 与 dst
+        if [[ $proto == "udp" ]]; then
             if [[ $src =~ - ]]; then
-                start=$(echo $src | cut -d- -f1)
-                end=$(echo $src | cut -d- -f2)
-                for ((i=start;i<=end;i++)); do UDP_PORTS+=($i); done
+                s=$(echo $src | cut -d- -f1)
+                e=$(echo $src | cut -d- -f2)
+                for ((i=s;i<=e;i++)); do UDP_PORTS+=($i); done
             else
                 UDP_PORTS+=($src)
             fi
             UDP_PORTS+=($dst)
-        elif [[ "$proto" == "tcp" ]]; then
+        else
             TCP_PORTS+=($src)
             TCP_PORTS+=($dst)
         fi
     done < "$PROT_FILE"
+
+    echo "  }" >> "$NFT_FILE"
+    echo "}" >> "$NFT_FILE"
 
     nft -f "$NFT_FILE"
     nft list ruleset > /etc/nftables.conf
@@ -185,7 +202,9 @@ show_summary() {
     echo "🔑 SSH端口放行: $SSH_PORT"
     echo "💻 TCP 放行端口: $(merge_ports "${TCP_PORTS[@]}")"
     echo "📡 UDP 放行端口: $(merge_ports "${UDP_PORTS[@]}")"
-    grep -q '^icmp' "$PROT_FILE" && echo "📢 ICMP: 放行" || echo "📢 ICMP: 阻止"
+
+    grep -q '^icmp' "$PROT_FILE" && echo "📢 ICMP: 放行"
+
     echo "⚡ 内部端口重定向:"
     for f in "${FORWARD_PORTS[@]}"; do
         proto=$(echo $f | cut -d: -f1 | tr '[:lower:]' '[:upper:]')
