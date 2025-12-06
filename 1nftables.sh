@@ -23,21 +23,11 @@ echo "=== Step 3: 写入 /etc/nftables.conf ==="
 cat > /etc/nftables.conf <<'EOF'
 #!/usr/sbin/nft -f
 # ==========================================
-# NAT 表 - UDP 50000-60000 重定向到 63448
-# ==========================================
-table inet nat {
-    chain prerouting {
-        type nat hook prerouting priority -100;
-        # UDP 端口重定向
-        udp dport 50000-60000 redirect to :63448
-    }
-}
-# ==========================================
 # Filter 表 - 放行 TCP/UDP/ICMP
 # ==========================================
 table inet filter {
     chain input {
-        type filter hook input priority 0; policy drop;
+        type filter hook input priority filter; policy drop;
         # 已建立连接允许
         ct state established,related accept
         # 回环接口允许
@@ -51,6 +41,15 @@ table inet filter {
         udp dport {53,443,63447,63448} accept
         udp dport 50000-60000 accept
     }
+}
+# ==========================================
+# NAT 表 - UDP 50000-60000 重定向到 63448
+# ==========================================
+table inet nat {
+	chain prerouting {
+		type nat hook prerouting priority dstnat; policy accept;
+		udp dport 50000-60000 redirect to :63448
+	}
 }
 EOF
 
