@@ -32,10 +32,6 @@ bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/arm_openresty_cloud
 
 bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/arm_openresty_cloudflare_ips.sh)
 
-飞牛OS系统服务交互可选开关
-
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/FnOS.sh)
-
 在指定路径生成伪域名证书
 
 bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/fake_cert.sh)
