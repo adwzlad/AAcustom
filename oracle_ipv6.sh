@@ -13,6 +13,6 @@ echo "[3] 删除 cron 定时任务..."
 crontab -l 2>/dev/null | grep -v "auto_ipv6.sh" | crontab -
 
 echo "[4] 可选：删除 /root/oracle_ipv6（仅当你不再需要）"
-# rm -f /root/oracle_ipv6
+rm -f /root/oracle_ipv6
 
 echo "[完成] 所有由此脚本创建的内容均已移除。"
