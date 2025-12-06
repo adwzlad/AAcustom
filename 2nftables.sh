@@ -24,27 +24,27 @@ echo "=== Step 3: 写入 /etc/nftables.conf（默认全放行） ==="
 cat > /etc/nftables.conf <<'EOF'
 #!/usr/sbin/nft -f
 # ==========================================
-# NAT 表 - UDP 50000-60000 重定向到 63448
-# ==========================================
-table inet nat {
-    chain prerouting {
-        type nat hook prerouting priority -100;
-        udp dport 50000-60000 redirect to :63448
-    }
-}
-# ==========================================
 # Filter 表 - 默认全部放行（ACCEPT）
 # ==========================================
 table inet filter {
-    chain input {
-        type filter hook input priority 0; policy accept;
-    }
-    chain forward {
-        type filter hook forward priority 0; policy accept;
-    }
-    chain output {
-        type filter hook output priority 0; policy accept;
-    }
+	chain input {
+		type filter hook input priority filter; policy accept;
+	}
+	chain forward {
+		type filter hook forward priority filter; policy accept;
+	}
+	chain output {
+		type filter hook output priority filter; policy accept;
+	}
+}
+# ==========================================
+# NAT 表 - UDP 50000-60000 重定向到 63448
+# ==========================================
+table inet nat {
+	chain prerouting {
+		type nat hook prerouting priority dstnat; policy accept;
+		udp dport 50000-60000 redirect to :63448
+	}
 }
 EOF
 
