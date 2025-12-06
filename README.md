@@ -12,12 +12,6 @@ bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/Debian-S
 
 bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/CentOS-Setting.sh)
 
-适用于从 Debian 11 升级到 Debian 12 的一键 .sh 脚本
-
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/upgrade-to-debian12.sh)
-
-bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/upgrade-to-debian12.sh)
-
 Oracle自动获取IPV6
 
 nano /root/oracle_ipv6 && bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/oracle_ipv6.sh)
@@ -55,16 +49,6 @@ bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/1nftables.sh)
 Debian12 nftables防火墙管理nftables.sh（系统层面所有端口放行，保留 UDP 端口重定向）
 
 bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/2nftables.sh)
-
-Debian12 iptables防火墙管理firewall.sh
-
-sudo bash -c "curl -sL https://github.com/adwzlad/AAcustom/raw/main/firewall.sh -o /root/firewall.sh && chmod +x /root/firewall.sh && /root/firewall.sh"
-
-UFW防火墙规则配置，并定时每天凌晨 4 点更新关于cloudflare_ip的规则
-
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/manage_ufw.sh)
-
-bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/manage_ufw.sh)
 
 如何安装 bash（如果未安装），如果 which bash 或 command -v bash 有输出，说明 bash 已安装
 
