@@ -48,9 +48,13 @@ bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/fake_cert.sh)
 
 bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/fake_cert.sh)
 
-Debian12 nftables防火墙管理nftables.sh（支持ipv4/ipv6端口转发）
+Debian12 nftables防火墙管理nftables.sh（支持ipv4/ipv6端口转发+放行端口）
 
-bash -c "curl -sL https://github.com/adwzlad/AAcustom/raw/main/nftables.sh -o /root/nftables.sh && chmod +x /root/nftables.sh && /root/nftables.sh"
+bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/1nftables.sh)
+
+Debian12 nftables防火墙管理nftables.sh（系统层面所有端口放行，保留 UDP 端口重定向）
+
+bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/2nftables.sh)
 
 Debian12 iptables防火墙管理firewall.sh
 
