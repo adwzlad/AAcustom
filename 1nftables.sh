@@ -36,7 +36,7 @@ table inet filter {
         meta l4proto icmp accept
         meta l4proto ipv6-icmp accept
         # TCP 端口放行
-        tcp dport {53,80,443,8443,2053,2083,36098} accept
+        tcp dport {53,80,443,2053,2083,36098} accept
         # UDP 端口放行
         udp dport {53,443,63447,63448} accept
         udp dport 50000-60000 accept
