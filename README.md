@@ -1,44 +1,34 @@
 Debian/Ubuntu 系统清理
 
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/clean-debian.sh)
-
-bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/clean-debian.sh)
+bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/clean-debian.sh)
 
 更换系统语言、修改时区/密码/SSH
 
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/Debian-Setting.sh)
+bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/Debian-Setting.sh)
 
-bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/Debian-Setting.sh)
-
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/CentOS-Setting.sh)
+bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/CentOS-Setting.sh)
 
 CF通配符域名证书申请
 
 /root/.acme.sh/acme.sh --register-account -m a@b.com
 
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/SSL_CF_DNS.sh)
-
-bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/SSL_CF_DNS.sh)
+bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/SSL_CF_DNS.sh)
 
 生成/usr/local/openresty/nginx/cloudflare_ips.conf，并定时更新
 
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/arm_openresty_cloudflare_ips.sh)
-
-bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/arm_openresty_cloudflare_ips.sh)
+bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/arm_openresty_cloudflare_ips.sh)
 
 在指定路径生成伪域名证书
 
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/fake_cert.sh)
-
-bash <(curl -sL https://testingcf.jsdelivr.net/gh/adwzlad/AAcustom@main/fake_cert.sh)
+bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/raw/main/fake_cert.sh)
 
 Debian12 nftables防火墙管理nftables.sh（支持ipv4/ipv6端口转发+放行端口）
 
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/1nftables.sh)
+bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/1nftables.sh)
 
 Debian12 nftables防火墙管理nftables.sh（系统层面所有端口放行，保留 UDP 端口重定向）
 
-bash <(curl -sL https://github.com/adwzlad/AAcustom/raw/main/2nftables.sh)
+bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/2nftables.sh)
 
 如何安装 bash（如果未安装），如果 which bash 或 command -v bash 有输出，说明 bash 已安装
 
