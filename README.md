@@ -22,14 +22,6 @@ bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/arm_open
 
 bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/raw/main/fake_cert.sh)
 
-Debian12 nftables防火墙管理nftables.sh（支持ipv4/ipv6端口转发+放行端口）
-
-bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/1nftables.sh)
-
-Debian12 nftables防火墙管理nftables.sh（系统层面所有端口放行，保留 UDP 端口重定向）
-
-bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/2nftables.sh)
-
 如何安装 bash（如果未安装），如果 which bash 或 command -v bash 有输出，说明 bash 已安装
 
 opkg update
