@@ -10,8 +10,6 @@ bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/CentOS-S
 
 CF通配符域名证书申请
 
-/root/.acme.sh/acme.sh --register-account -m a@b.com
-
 bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/SSL_CF_DNS.sh)
 
 生成/usr/local/openresty/nginx/cloudflare_ips.conf，并定时更新
