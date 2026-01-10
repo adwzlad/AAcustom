@@ -26,6 +26,9 @@ fi
 # 输入主域名
 read -p "请输入要签发的主域名 (例如 a.com): " DOMAIN
 
+# 输入邮箱，用于注册 ZeroSSL 账号
+read -p "请输入邮箱 (用于 ZeroSSL 账号注册): " ACME_EMAIL
+
 CERT_DIR="/root/cert"
 mkdir -p "${CERT_DIR}"
 
@@ -41,6 +44,10 @@ fi
 # 加载 acme.sh 环境变量
 export PATH=$PATH:/root/.acme.sh
 source /root/.bashrc 2>/dev/null || true
+
+# 注册 ZeroSSL 账户（如果还未注册）
+echo "[INFO] 注册 ZeroSSL 账号..."
+/root/.acme.sh/acme.sh --register-account -m "$ACME_EMAIL" || true
 
 # 导出 Cloudflare Token 环境变量
 export CF_Token="$CF_Token"
