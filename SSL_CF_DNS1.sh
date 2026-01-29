@@ -1,90 +1,90 @@
 #!/bin/bash
 # ========================================
-# 增强版一键签发 主域名 + *.域名 通配符证书
-# 使用 acme.sh + ECC/RSA，支持 ZeroSSL 与 Let’s Encrypt
-# 自动注册账号，支持 Cloudflare DNS
+# Cloudflare DNS-01 稳定版通配符证书签发脚本
+# acme.sh + ZeroSSL
+# 解决：TXT 提前清理 / 重复输入 / 时序翻车
 # ========================================
 
 set -e
 
-# ========== 检查 root ==========
+CONF_FILE="/root/.acme_cf_env"
+CERT_DIR="/root/cert"
+LOG_PATH="${CERT_DIR}/acme.sh.log"
+
+# ========= root 检查 =========
 if [[ $EUID -ne 0 ]]; then
-  echo "[ERROR] 请使用 root 权限执行：sudo -i"
+  echo "[ERROR] 请使用 root 执行：sudo -i"
   exit 1
 fi
 
-# ========== 输入 Cloudflare Token ==========
-if [ -n "$CF_Token" ]; then
-  echo "[INFO] 检测到已有 Cloudflare API Token: ${CF_Token:0:10}******"
-  read -p "是否使用此 Token？(Y/n): " use_old
-  case "$use_old" in
-    [nN]*) read -p "请输入新的 Cloudflare API Token: " CF_Token ;;
-    *) echo "[INFO] 继续使用现有 Token" ;;
-  esac
+mkdir -p "$CERT_DIR"
+
+# ========= 读取 / 写入配置 =========
+if [ -f "$CONF_FILE" ]; then
+  source "$CONF_FILE"
+  echo "[INFO] 已加载历史配置：$CONF_FILE"
 else
   read -p "请输入 Cloudflare API Token: " CF_Token
+  read -p "请输入主域名 (例如 a.com): " DOMAIN
+  read -p "请输入邮箱 (用于 ZeroSSL 注册): " ACME_EMAIL
+
+  cat >"$CONF_FILE" <<EOF
+export CF_Token="$CF_Token"
+export DOMAIN="$DOMAIN"
+export ACME_EMAIL="$ACME_EMAIL"
+EOF
+
+  chmod 600 "$CONF_FILE"
+  source "$CONF_FILE"
+  echo "[INFO] 配置已保存，下次无需重复输入"
 fi
+
 export CF_Token
 
-# ========== 输入域名与邮箱 ==========
-read -p "请输入主域名 (例如 a.com): " DOMAIN
-read -p "请输入邮箱 (用于 ZeroSSL/LE 注册): " ACME_EMAIL
-
-# ========== 创建证书目录 ==========
-CERT_DIR="/root/cert"
-mkdir -p "${CERT_DIR}"
-KEY_PATH="${CERT_DIR}/private.key"
-CERT_PATH="${CERT_DIR}/public.crt"
-LOG_PATH="${CERT_DIR}/acme.sh.log"
-
-# ========== 安装 acme.sh ==========
+# ========= 安装 acme.sh =========
 if [ ! -f "/root/.acme.sh/acme.sh" ]; then
-  echo "[INFO] acme.sh 未安装，正在安装..."
-  curl https://get.acme.sh | sh
+  echo "[INFO] 安装 acme.sh ..."
+  curl -s https://get.acme.sh | sh
 fi
 
-export PATH=$PATH:/root/.acme.sh
-source /root/.bashrc 2>/dev/null || true
+export PATH="$PATH:/root/.acme.sh"
 
-# ========== 注册账号 ==========
-echo "[INFO] 注册 ZeroSSL / Let’s Encrypt 账号..."
-/root/.acme.sh/acme.sh --register-account -m "$ACME_EMAIL" >>"$LOG_PATH" 2>&1 || true
+# ========= 注册账号（幂等） =========
+echo "[INFO] 注册 / 确认 ZeroSSL 账号..."
+acme.sh --register-account -m "$ACME_EMAIL" --server zerossl >>"$LOG_PATH" 2>&1 || true
 
-# ========== 签发函数 ==========
-issue_cert() {
-  local KEYLEN="$1"
-  local CA="$2"
+# ========= 签发证书（关键部分） =========
+echo "[INFO] 开始签发 ${DOMAIN} 和 *.${DOMAIN}"
+echo "[INFO] 使用 ZeroSSL + ECC + DNS-01"
 
-  echo "[INFO] 开始签发 ${DOMAIN} 和 *.${DOMAIN}，Key: $KEYLEN, CA: $CA"
-  
-  if ! /root/.acme.sh/acme.sh \
-    --issue --dns dns_cf -d "${DOMAIN}" -d "*.${DOMAIN}" \
-    --keylength "$KEYLEN" --server "$CA" --dnssleep 60 --debug >>"$LOG_PATH" 2>&1; then
-    return 1
-  fi
+acme.sh --issue \
+  --dns dns_cf \
+  -d "${DOMAIN}" \
+  -d "*.${DOMAIN}" \
+  --keylength ec-256 \
+  --dnssleep 180 \
+  --server zerossl \
+  --debug \
+  >>"$LOG_PATH" 2>&1
 
-  echo "[INFO] 安装证书到 ${CERT_DIR} ..."
-  /root/.acme.sh/acme.sh --install-cert -d "${DOMAIN}" \
-    --key-file "${KEY_PATH}" \
-    --fullchain-file "${CERT_PATH}" \
-    --ecc 2>/dev/null >>"$LOG_PATH" 2>&1 || true
+# ========= 安装证书 =========
+echo "[INFO] 安装证书到 ${CERT_DIR}"
 
-  chmod 600 "${KEY_PATH}" 2>/dev/null
-  chmod 644 "${CERT_PATH}" 2>/dev/null
+acme.sh --install-cert -d "${DOMAIN}" \
+  --ecc \
+  --key-file       "${CERT_DIR}/private.key" \
+  --fullchain-file "${CERT_DIR}/public.crt" \
+  >>"$LOG_PATH" 2>&1
 
-  echo "[SUCCESS] 证书签发完成！"
-  echo "私钥: ${KEY_PATH}"
-  echo "证书: ${CERT_PATH}"
-}
+chmod 600 "${CERT_DIR}/private.key"
+chmod 644 "${CERT_DIR}/public.crt"
 
-# ========== 尝试 ECC，失败切换 RSA ==========
-if ! issue_cert "ec-256" "zerossl"; then
-  echo "[WARN] ECC 签发失败，尝试 RSA ..."
-  issue_cert "4096" "zerossl" || issue_cert "4096" "letsencrypt"
-fi
+# ========= 自动续期 =========
+acme.sh --install-cronjob >>"$LOG_PATH" 2>&1
 
-# ========== 安装 cron ==========
-echo "[INFO] 安装自动续签任务..."
-/root/.acme.sh/acme.sh --install-cronjob >>"$LOG_PATH" 2>&1
-
-echo "[DONE] 任务完成！日志: $LOG_PATH"
+echo "========================================"
+echo "[SUCCESS] 证书签发并安装完成 🎉"
+echo "私钥: ${CERT_DIR}/private.key"
+echo "证书: ${CERT_DIR}/public.crt"
+echo "日志: ${LOG_PATH}"
+echo "========================================"
