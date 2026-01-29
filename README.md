@@ -8,7 +8,7 @@ bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/Debian-S
 
 bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/CentOS-Setting.sh)
 
-CF通配符域名证书申请
+CF通配符域名证书   申请失败/续签/重跑（不会再问任何问题） bash ssl.sh 如果你想换域名/Token  rm -f /root/.acme-auto/config && bash ssl.sh
 
 bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/SSL_CF_DNS1.sh)
 
