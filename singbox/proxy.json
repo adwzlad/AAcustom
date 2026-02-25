@@ -3,6 +3,8 @@
   "rules": [
     {
       "domain_suffix": [
+        "airdroid.cn",
+        "airdroid.com",
         "fast.com",
         "docker.com",
         "ipaddress.com",
