@@ -8,6 +8,10 @@ bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/1Debian-
 
 bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/CentOS-Setting.sh)
 
+删除/dev/sda3 swap分区，并入/dev/sda2
+
+bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/swap.sh)
+
 CF通配符域名证书   申请失败/续签/重跑（不会再问任何问题）   bash ssl.sh   如果你想换域名/Token     rm -f /root/.acme-auto/config && bash ssl.sh
 
 bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/SSL_CF_DNS1.sh)
