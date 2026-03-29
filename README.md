@@ -8,7 +8,7 @@ bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/1Debian-
 
 bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/CentOS-Setting.sh)
 
-删除/dev/sda3 swap分区，并入/dev/sda2
+删除/dev/sda3 swap分区，并入/dev/sda2.重启生效
 
 bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/swap.sh)
 
