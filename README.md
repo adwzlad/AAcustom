@@ -4,7 +4,7 @@ bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/clean-de
 
 更换系统语言、修改时区/密码/SSH
 
-bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/Debian-Setting.sh)
+bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/1Debian-Setting.sh)
 
 bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/CentOS-Setting.sh)
 
