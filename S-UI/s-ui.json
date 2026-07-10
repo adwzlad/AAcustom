@@ -1,0 +1,192 @@
+  "route": {
+    "rules": [
+      {
+        "action": "sniff"
+      },
+      {
+        "protocol": [
+          "dns"
+        ],
+        "action": "hijack-dns"
+      },
+      {
+        "rule_set": [
+          "geosite-direct",
+          "geosite-cloudflare",
+          "geoip-cloudflare",
+          "geosite-google",
+          "geoip-google",
+          "geosite-proxy",
+          "geosite-wechat",
+          "geoip-wechat",
+          "geosite-cn",
+          "geoip-cn"
+        ],
+        "rule_set_ip_cidr_match_source": false,
+        "action": "route",
+        "outbound": "direct"
+      },
+      {
+        "rule_set": [
+          "geosite-ai",
+          "geosite-x",
+          "geosite-facebook",
+          "geoip-facebook",
+          "geosite-tiktok",
+          "geosite-netflix",
+          "geoip-netflix",
+          "geosite-paypal"
+        ],
+        "rule_set_ip_cidr_match_source": false,
+        "action": "route",
+        "outbound": "WarpSocks出口"
+      }
+    ],
+    "rule_set": [
+      {
+        "type": "remote",
+        "tag": "geosite-ai",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/category-ai-!cn.srs",
+        "download_detour": "direct",
+        "update_interval": "2d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-google",
+        "format": "binary",
+        "download_detour": "direct",
+        "update_interval": "2d",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/google.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "geoip-google",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geoip/google.srs",
+        "download_detour": "direct",
+        "update_interval": "2d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-x",
+        "format": "binary",
+        "download_detour": "direct",
+        "update_interval": "2d",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/x.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-facebook",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/facebook.srs",
+        "download_detour": "direct",
+        "update_interval": "2d"
+      },
+      {
+        "type": "remote",
+        "tag": "geoip-facebook",
+        "format": "binary",
+        "download_detour": "direct",
+        "update_interval": "2d",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geoip/facebook.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-tiktok",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/tiktok.srs",
+        "download_detour": "direct",
+        "update_interval": "2d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-netflix",
+        "format": "binary",
+        "download_detour": "direct",
+        "update_interval": "2d",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/netflix.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "geoip-netflix",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geoip/netflix.srs",
+        "download_detour": "direct",
+        "update_interval": "2d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-wechat",
+        "format": "source",
+        "download_detour": "direct",
+        "update_interval": "2d",
+        "url": "https://raw.githubusercontent.com/adwzlad/AAcustom/main/singbox/geosite-wechat.json"
+      },
+      {
+        "type": "remote",
+        "tag": "geoip-wechat",
+        "format": "source",
+        "url": "https://raw.githubusercontent.com/adwzlad/AAcustom/main/singbox/geoip-wechat.json",
+        "download_detour": "direct",
+        "update_interval": "2d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-proxy",
+        "format": "source",
+        "url": "https://raw.githubusercontent.com/adwzlad/AAcustom/main/singbox/proxy-serives.json",
+        "download_detour": "direct",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-direct",
+        "format": "source",
+        "url": "https://raw.githubusercontent.com/adwzlad/AAcustom/main/singbox/direct-serives.json",
+        "download_detour": "direct",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/cn.srs",
+        "download_detour": "direct",
+        "update_interval": "2d"
+      },
+      {
+        "type": "remote",
+        "tag": "geoip-cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geoip/cn.srs",
+        "download_detour": "direct",
+        "update_interval": "2d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-paypal",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/paypal.srs",
+        "download_detour": "direct",
+        "update_interval": "2d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-cloudflare",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/cloudflare.srs",
+        "download_detour": "direct",
+        "update_interval": "2d"
+      },
+      {
+        "type": "remote",
+        "tag": "geoip-cloudflare",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo-lite/geoip/cloudflare.srs",
+        "download_detour": "direct",
+        "update_interval": "2d"
+      }
+    ],
+    "final": "direct"
+  }
