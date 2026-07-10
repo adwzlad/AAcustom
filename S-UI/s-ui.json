@@ -1,3 +1,322 @@
+{
+  "log": {
+    "level": "info"
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "https",
+        "server_port": 443,
+        "tls": {},
+        "headers": {},
+        "tag": "dns-ndG",
+        "server": "8.8.8.8"
+      }
+    ],
+    "rules": []
+  },
+  "ntp": null,
+  "inbounds": [
+    {
+      "auth_timeout": "60s",
+      "congestion_control": "bbr",
+      "heartbeat": "20s",
+      "listen": "::",
+      "listen_port": 443,
+      "tag": "T-OUSS",
+      "tls": {
+        "alpn": [
+          "h3"
+        ],
+        "certificate": [
+          "-----BEGIN CERTIFICATE-----",
+          "MIIDGDCCAgCgAwIBAgIQNyrUE9cseN5ZbT+5V/JjSzANBgkqhkiG9w0BAQsFADAd",
+          "MRswGQYDVQQDExJzdGF0aWNpLmljbG91ZC5jb20wHhcNMjUwODI0MTUwMTU0WhcN",
+          "MjYwODI0MTYwMTU0WjAdMRswGQYDVQQDExJzdGF0aWNpLmljbG91ZC5jb20wggEi",
+          "MA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDnBt0bXKBj4wefmUHQK3PCOrL3",
+          "UUoc2Fd36zKAKgTCzaMAAv8yIOd45izC0ofF+K+IxUQOCv4Kox2IhdpE/aG1q1kF",
+          "aeAL578Lq2VbcvOj7DczgbvHYivmtvErtOMIWO9VlzDSU80mOz3Jz/owQb6jzXS2",
+          "JPd0G4NrEp2vPsuDRk523YqF69Ska/uXrzg6dTSf8CvNeJuQQ/RGqMFYqJTyyHOT",
+          "+fdEEPLIjs1bwg3hC8Xos0VJ1kJR+pOF2R4kt6uZyGFHMVgjU0k77LJ6eZsqJ3fS",
+          "7RiwnXsOZ9cPtV5O3FKWjkt0hdf0GeYGcpQT6baWa55jL+Dm6ssHEEEpeMuXAgMB",
+          "AAGjVDBSMA4GA1UdDwEB/wQEAwIFoDATBgNVHSUEDDAKBggrBgEFBQcDATAMBgNV",
+          "HRMBAf8EAjAAMB0GA1UdEQQWMBSCEnN0YXRpY2kuaWNsb3VkLmNvbTANBgkqhkiG",
+          "9w0BAQsFAAOCAQEAXCFHApNQPjUXkZRCg8UOJg2VxP/4+0we4jIJCx3azqa91uFz",
+          "j31FaZJ2zS8sn8yD2tLK6jSxvrx8/NqlxMyMQYTsvNr4+8aL52b4aGQgzj+CE65o",
+          "O1jxdbXmdP4HpegKCqUTkRYQzSSrat3td6Le63Au7f+Bxe/OKWCDKscdnDJLgxiQ",
+          "eo9RiC5Jc8HcK5ERPlpdM3HxbUnJ3VmYji6WwTX5Pp2YObPGrYqJNbTALmNUPsRu",
+          "DyD2EwQN/6TZ6Ch7g110ePDyaMTHvhNU6sNaSHPTMRrYbVy+s4Cglycx7ZmILD7D",
+          "TQpGadYX2JRNJVTxjY/Dy2UNmoO0chEVBC6FGA==",
+          "-----END CERTIFICATE-----"
+        ],
+        "enabled": true,
+        "key": [
+          "-----BEGIN PRIVATE KEY-----",
+          "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDnBt0bXKBj4wef",
+          "mUHQK3PCOrL3UUoc2Fd36zKAKgTCzaMAAv8yIOd45izC0ofF+K+IxUQOCv4Kox2I",
+          "hdpE/aG1q1kFaeAL578Lq2VbcvOj7DczgbvHYivmtvErtOMIWO9VlzDSU80mOz3J",
+          "z/owQb6jzXS2JPd0G4NrEp2vPsuDRk523YqF69Ska/uXrzg6dTSf8CvNeJuQQ/RG",
+          "qMFYqJTyyHOT+fdEEPLIjs1bwg3hC8Xos0VJ1kJR+pOF2R4kt6uZyGFHMVgjU0k7",
+          "7LJ6eZsqJ3fS7RiwnXsOZ9cPtV5O3FKWjkt0hdf0GeYGcpQT6baWa55jL+Dm6ssH",
+          "EEEpeMuXAgMBAAECggEAHAYOHg/ko26E8eF3mpZwFUMPixvWNJzdh1NardyVn+0C",
+          "dQboCR71VQn+q1HkXFRSiUb8fq5Aq0Omr8p6HoecQlra5+Le5YgipCS8nRTa5FXL",
+          "9bh/8atBOLGU8ZX15YD8OdKm08Hh5F2n8hSt/C/ivcs3TrzkiLX/AVGhxQHbUpH3",
+          "9CXnM6f9uVuBAJ7thd2NTJSbW9FYlg5qwjX8P6w552HgJI57T1jJ9bKrjnUs0eeL",
+          "aNWSfOVgar8bqvqO4Ox7/pjrFInVyrG1NwrN0gCETyggbegedLqko+buMPe+Er6G",
+          "O+11QVgmxP3WnKvD9v5VbiTJ1+TY0/HJAAfUQu5PkQKBgQDoFAF5J0pD+EQiaRCr",
+          "KgK9bd1xscSw1EHjBlFctA8tbe4cSokQYMhlrhgMuWWQsqupt7NtHslgterG5Qdp",
+          "3Q8QDl7nfMdgDOLo7xKBYK6+3HfvBoqTi2ucUX/2S/iMvN6nqzOPwxngiEroPMQU",
+          "UArTnu6mFPCFdkcjjAddHjIgaQKBgQD+1x2cQJGyzoer9zNuBxAikBjY8dPT000a",
+          "/Q6ReCI0NhpoQSUUbYao/yLCh7IIGcPHHxLooU16+dccATy6k3vselNy5TWQl8ff",
+          "oypZOIC7GjN+FaZLfy0q1iqcCWpYr/7GIzFjzsnE3oFilkjsHPn0kPKxPqZh3aLX",
+          "F7z1WDYL/wKBgQCrvlpUwRm5cRli6aOXN1CtxIcS4z4uqfVUP1Goq+trcCW8s//4",
+          "qdbDQHG1wOGDkmVtBG/4ucbHFfj3VXgGBLxn4mqjHnkhAIhPXtSv/89xmQ/8SDf2",
+          "9j8dgEaVCyWVaRPQuuY+ZmBZBCOC960XZyCL+Nqc93QDIEOG79JnO7hWuQKBgQDn",
+          "kFLgq6942cBgW3TJMvPPZD6fy0ZfQa7bqjy1pIL4DH18ZE2sPUXShFtyhlkYkUjb",
+          "w/mrlv7PkvyK/vjO1LsTi6gOTAabR8AgD6Sog/Y9jbZiiIueKIbDWO5I8SlIQ0vv",
+          "gQUdG0cuc7z/921113Ktb5SHyFTpsrqIVpKmIayiwwKBgEocbdeQHvtAZxn1Mv7V",
+          "u9hegzrKjFL0hA2ewrtOgnOt8TWe/3XheEIDfR9dhxNc0MNI4daoIII7XEyVW0e0",
+          "yRZFSZb7b4OxcK27JFUBvH4W9oFTSslT6sG/32TSHOwTWenhUiNh7KaiJ3dWL6t3",
+          "U7n2VzKKJGd6DN9AqS42AR0v",
+          "-----END PRIVATE KEY-----"
+        ],
+        "server_name": "www.att.com"
+      },
+      "type": "tuic",
+      "users": [
+        {
+          "name": "OUSS",
+          "uuid": "ad44080a-4bdb-4d39-841a-b7361724f8bc",
+          "password": "mT2mcMGJDs"
+        }
+      ],
+      "zero_rtt_handshake": true
+    },
+    {
+      "listen": "::",
+      "listen_port": 443,
+      "tag": "vless-OUSS",
+      "tcp_fast_open": true,
+      "tcp_keep_alive": "5m",
+      "tcp_keep_alive_interval": "75s",
+      "tcp_multi_path": false,
+      "tls": {
+        "enabled": true,
+        "reality": {
+          "enabled": true,
+          "handshake": {
+            "server": "www.utb.edu.co",
+            "server_port": 443
+          },
+          "private_key": "KHWMk7NVWEGog8I_RUAC6U9s2c8wlURc5ThxpFEHcHk",
+          "short_id": [
+            "",
+            "3994a709ff",
+            "f4fbb0e605",
+            "25e0",
+            "93f65bdb",
+            "3b",
+            "80",
+            "bc",
+            "fdf43d3289",
+            "77",
+            "b9841a4dcc",
+            "c541",
+            "38dc",
+            "a0c4",
+            "d19f9c",
+            "a7",
+            "ca9e4742",
+            "73",
+            "de26",
+            "ebd7",
+            "4e63",
+            "13",
+            "20",
+            "c71ff3"
+          ]
+        },
+        "server_name": "www.utb.edu.co"
+      },
+      "transport": {},
+      "type": "vless",
+      "udp_fragment": false,
+      "udp_timeout": "5m",
+      "users": [
+        {
+          "name": "OUSS",
+          "uuid": "ad44080a-4bdb-4d39-841a-b7361724f8bc",
+          "flow": "xtls-rprx-vision"
+        }
+      ]
+    },
+    {
+      "auth_timeout": "60s",
+      "congestion_control": "bbr",
+      "heartbeat": "20s",
+      "listen": "::",
+      "listen_port": 63447,
+      "tag": "T1-OUSS",
+      "tls": {
+        "alpn": [
+          "h3"
+        ],
+        "certificate": [
+          "-----BEGIN CERTIFICATE-----",
+          "MIIDIjCCAgqgAwIBAgIRAJhsR/VvzfK1TWkFU1slRVUwDQYJKoZIhvcNAQELBQAw",
+          "IDEeMBwGA1UEAxMVYW1idWxvcHJvcGVydHkuY29tLmF1MB4XDTI1MTIxMzA2MTA1",
+          "M1oXDTI2MTIxMzA3MTA1MlowIDEeMBwGA1UEAxMVYW1idWxvcHJvcGVydHkuY29t",
+          "LmF1MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoKFgfpOShQlWdJrA",
+          "oS+LgyibAm5ekE2bF08hdCMv8cWZYtBplRS1EUYz3DUiIs8yz5I95O5QXiuP8/M9",
+          "byddmW0ivpoiOJmBlNcQA1JvtYX+9u+PN5CM5JM8PTOcdzquJrGWglcEvmbZM+T4",
+          "C86IQ2TBNRjctwTeKa7cEY0zn1P3FUBLlDn0UyNdxFds29fRF7pVd/w5SPJGpToP",
+          "zIiI4aI1UCOSbU+ND62fUCuiX3jwdBhJw++JRvtXfclf2NAcSRL0tY4adTUkmDem",
+          "NV328SYHhlP2eE6P9SDumd1qujIM0ZVDI6KsKhLrUYTsiGX58crBShzIlcQEh4/L",
+          "JvTOUQIDAQABo1cwVTAOBgNVHQ8BAf8EBAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUH",
+          "AwEwDAYDVR0TAQH/BAIwADAgBgNVHREEGTAXghVhbWJ1bG9wcm9wZXJ0eS5jb20u",
+          "YXUwDQYJKoZIhvcNAQELBQADggEBADTY3d3CCKpG1c1UZdOucnEzrePSXH31MSyp",
+          "xKiQPo6sMe05tNcbzD4hDpquNTugLFCvguJA1oEbr9KP0/wqAM9x0eYI66LlM47L",
+          "7aR3qH0eWibqypX8t3zxdlW8994bHXT7YscP4K1nzRDOJ0LmagAlYV9U6xWdVGDE",
+          "GOvuyOiev4o9gEHPzEK8yoxC8zkSRjDzn8DcY3yetyJxwfA44QqkP1uVSYIHtByj",
+          "FpOriZcxhRwpd0Vwf+V85cfF9Yu5ktubCkva5NOXfUJ2P5vVkaFryd7zR4pRKeUV",
+          "oTEGNPuloQOESylAawAlk2WKwjf3d56inSGumj1tLhzXk4kq3FE=",
+          "-----END CERTIFICATE-----"
+        ],
+        "enabled": true,
+        "key": [
+          "-----BEGIN PRIVATE KEY-----",
+          "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCgoWB+k5KFCVZ0",
+          "msChL4uDKJsCbl6QTZsXTyF0Iy/xxZli0GmVFLURRjPcNSIizzLPkj3k7lBeK4/z",
+          "8z1vJ12ZbSK+miI4mYGU1xADUm+1hf727483kIzkkzw9M5x3Oq4msZaCVwS+Ztkz",
+          "5PgLzohDZME1GNy3BN4prtwRjTOfU/cVQEuUOfRTI13EV2zb19EXulV3/DlI8kal",
+          "Og/MiIjhojVQI5JtT40PrZ9QK6JfePB0GEnD74lG+1d9yV/Y0BxJEvS1jhp1NSSY",
+          "N6Y1XfbxJgeGU/Z4To/1IO6Z3Wq6MgzRlUMjoqwqEutRhOyIZfnxysFKHMiVxASH",
+          "j8sm9M5RAgMBAAECggEABWr8CLjsh701Y9B2b9ldMMrVU6MqYF6lvQcHv1WSf+qk",
+          "zk7uSL9+jfsas7I9GQR5F8Q8fzTElDCO9fD94Ppob0zdj6U+Qz92PfF1Ek+dAffn",
+          "jietYnfnMKyAqyXLAMCDcD2sMHBD8jIg4F24Ohm4weErnSFeDHRHFAvYU2U6WQTb",
+          "0axIiMSpG1Dz5JRaWDP2GFPRLNZAc9ChD9v5gAgvN+ZCto3D5XkNhut4ZFd4ZZ4G",
+          "7iSNi+GBuFEVMI+v+6b974cB5vJisX9yFUJCaz7Fpo39nmTTCQBWKzjCqCIOmHK7",
+          "3rQ2EfW7c7pdnEuln1ceYt63cIWssig/jGCYAkfBAQKBgQDHbpVG7H46mdSSJlPA",
+          "uQ3ay554ITOst/xtPvXpbHccc0XFApmDDy4MQwB0ZzAKuw6rNRn8c0/xqI3C72hR",
+          "aq0jVSAIuNEyxeSd80oogKXAwYdoZoGZtK/2y1tE3G2gap/BEfkfgqKxFlhuA0Hc",
+          "XsSL0yNh55YQLF9qGDk47JQx8QKBgQDOMUgmStSU1zzvsEi0WhxxXvA0HxY5hajK",
+          "k7e+1u00IyTzxQ8ER7ozJscSujYMmeKXrwrYeCqrYpOfmXQLUmcd88gjStGtRZAn",
+          "mQR1e5pJX27jLTRYux9NaoTD3iDlhpn14cPFzWDd5bb513fTEudajIvjuqUnQx+6",
+          "2PD11woCYQKBgFI4UgzSdVwdjZjPeloLMR4SMnweXBqKI+S6P1ID6Ltu/sWxQ67X",
+          "tElT2j0jSZgy9GI7W0JMHBpqPj+uyhg+3bCiaLmP0JeZJJ7F7b3zA+MLJpMxJ59B",
+          "8gXSYwdpxTyMmN5VVZrbFc3ig4SfjSiYXXm0C3NSsfhrAs9Pu0+voY1RAoGBAIRR",
+          "C8PG8XQyS2Bk98MEsIvwKKTJ7jErnI2jDZ7hvYZfpy7nniNZBBwfHlDePiEH/2jn",
+          "Y0ZWlss0jxc0GkvJrXKDJkO/l55hrYg7oajikLfVDguqzpTCP+wmFty6htHD9rjb",
+          "EA63JRpAd5MMulAxKVXqKzsQYzs2z/3PiZG5VSsBAoGBAKlmzC0+mRPduoZ6vwjj",
+          "wYFtEQaUVDwult8pJCZnqIGBiMB0o2+T6jwwTNghh7K1iiuzE2SKFgJbZQTn59sW",
+          "CRxhjCJrg9w1yC+AJ4FMC/IPSV+Cd3aJBUcnsFdJx2llpqgQDLsvVZy9CqgnJszF",
+          "YIgkMIAE5SOMiO8mp7ib+rjM",
+          "-----END PRIVATE KEY-----"
+        ],
+        "server_name": "ambuloproperty.com.au"
+      },
+      "type": "tuic",
+      "users": [
+        {
+          "name": "OUSS",
+          "uuid": "ad44080a-4bdb-4d39-841a-b7361724f8bc",
+          "password": "mT2mcMGJDs"
+        }
+      ],
+      "zero_rtt_handshake": true
+    },
+    {
+      "auth_timeout": "60s",
+      "congestion_control": "bbr",
+      "heartbeat": "20s",
+      "listen": "::",
+      "listen_port": 63448,
+      "tag": "T2-OUSS",
+      "tls": {
+        "alpn": [
+          "h3"
+        ],
+        "certificate": [
+          "-----BEGIN CERTIFICATE-----",
+          "MIIDHzCCAgegAwIBAgIRAPJUfXIFiPxl6WjlgMtxDZgwDQYJKoZIhvcNAQELBQAw",
+          "HzEdMBsGA1UEAxMUY2hyaXN0aWFubWNrZW1pZS5jb20wHhcNMjUxMjA0MTExMTI1",
+          "WhcNMjYxMjA0MTIxMTI1WjAfMR0wGwYDVQQDExRjaHJpc3RpYW5tY2tlbWllLmNv",
+          "bTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAL59ydjoJgsMSlGWi4fL",
+          "/opc391Gwi6r1A9MhR5Q0VNecSmoGLhk5IHYGBHY+bQJ2wN0BYsN4n+OGGpT0wM4",
+          "TJPHXMpjwEkhASIZ7QllHJShNmYshcO0vtZtJAzbxK0C/PXV1JauyLpy4aZtC0F0",
+          "SRt1dQRtNn4Wq/AfcZ24FdhentzgTjiNeDx+58FVPZMRSjRjG3V0p5sIb5RBIK1R",
+          "qANkI8HoqHAg/MEeB4MXl7CXZVL3FssTuXCpZn54vV2U4+fqUQcTMkK319dVsCuq",
+          "ZoOs0ePx6GaeW1YlDeWOg05BlWTETXarL+E1dZDVvkaSUf9vGDTMraR2fUrmkZMS",
+          "pCsCAwEAAaNWMFQwDgYDVR0PAQH/BAQDAgWgMBMGA1UdJQQMMAoGCCsGAQUFBwMB",
+          "MAwGA1UdEwEB/wQCMAAwHwYDVR0RBBgwFoIUY2hyaXN0aWFubWNrZW1pZS5jb20w",
+          "DQYJKoZIhvcNAQELBQADggEBAI71wN2olRmbqbLLFV6NAzuPL2MVqwCQfB4pxJfK",
+          "KRe2ybnvLlcawwxpwBlf8kXvd8SMdiDftj3uqmU0UsrGgbCaqwwSNuoarYqc/NqP",
+          "8vI1SpLP8/8QZgSOOi7GrXQcW5qntY+P5I4KyQXEx9ygzy6SBGtCHarnzuh7zvxx",
+          "KEQyAwTNUpHlGoC+DuYyUjuxtY3hhmbLjzjpEPrckE86qk0QRiTQ8acoLmzO6FzL",
+          "aoSJVuCFyMz9XUzZmNdr6I5RGgUoOOjvrEOJ0UYUXxHblUx3QEWzOtz09H9+9s1i",
+          "wCNpxwOGQyLfjIfuHhaH4TtN73aNnKW2PuC4DBLgqDoFmEo=",
+          "-----END CERTIFICATE-----"
+        ],
+        "enabled": true,
+        "key": [
+          "-----BEGIN PRIVATE KEY-----",
+          "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC+fcnY6CYLDEpR",
+          "louHy/6KXN/dRsIuq9QPTIUeUNFTXnEpqBi4ZOSB2BgR2Pm0CdsDdAWLDeJ/jhhq",
+          "U9MDOEyTx1zKY8BJIQEiGe0JZRyUoTZmLIXDtL7WbSQM28StAvz11dSWrsi6cuGm",
+          "bQtBdEkbdXUEbTZ+FqvwH3GduBXYXp7c4E44jXg8fufBVT2TEUo0Yxt1dKebCG+U",
+          "QSCtUagDZCPB6KhwIPzBHgeDF5ewl2VS9xbLE7lwqWZ+eL1dlOPn6lEHEzJCt9fX",
+          "VbArqmaDrNHj8ehmnltWJQ3ljoNOQZVkxE12qy/hNXWQ1b5GklH/bxg0zK2kdn1K",
+          "5pGTEqQrAgMBAAECggEACeHsvtwMXTZeBK2Sv5DNu8/lrU0mddVkQwbtQQ1gTrrv",
+          "lAGshqR1VmcnmIVxLu3z9tHmF7i4r3VnvtxqbhhVoLUPE1DpgOG9dU9zBLHCMdPL",
+          "RrG4ntaZr/YpkKE2KuOky/wz8z1OHJ4pJsExfEvUHyCQ2ZHw6cmzUdnPwybxuy/W",
+          "j7tiuEE7lvl5fYLheWr1689jIhbGklq6cr6IcxplfI5UED83nnVwBJemgXBtSIDn",
+          "hNplF9Q2aKQMYMBPzsqSMbPTMc6YGHbdzjXRMNU3owvy960PGDZTPjGsnGn/hRUD",
+          "1Vv67055COwX678xtxCl9NcqIVGcvuKXuycfCPXFAQKBgQDUUJFH88sfjzDfjhwE",
+          "ZEgS2CqRZM5QnQXHI0jAg5eQPcVaN9IZRf1+QSUzKbac0l7rwOaKdVHVIeOvc03F",
+          "8u0ZNXe33wT2phB8PqIf1YZq7wfxXgNZ74dYiZS2r+p7sH3bbgzsjKgRBBot2UhC",
+          "wdh5Q9V+3tif4wa5+uBdaM8YEQKBgQDlr7NuzcxMAw9aMkrEmuAnyqdzqrVZUQmG",
+          "TCceYiJBacZ+9HUjhLaVPIiO/xs0BYKQBsbqInWGk9ufyvcfPUzDJaVt9yFdaiJe",
+          "Odv3cMOSJiS5sxs5IvRqqnY6cMarhoigfHPklPl1C7Q23PcV2hUGs2JCj39Xzrz3",
+          "4xWzQWTUewKBgQCtOBJfztKxK+Um702Cc8KtxTltp/3/nSyinPH1Ryd34j3KbnJ2",
+          "djjsMgBErsqzRZt14sr0ueUK63xUn9EbKCgzAgFrvYPSLAiVJZCmQlJJmj0zuo0n",
+          "ahpVrOHs7rdzNLpqNW5L7DIOt/cX4wdml7qirSpZOT0prVLGl51H+IPF0QKBgF/Z",
+          "e6KwxSGvYTe9pw/2pbZVTp3pTjaQp83gd66pOyxbDNesAjopRtxuX3p1IRALgJnE",
+          "Cjxo1uyrRUqgs5HYzfDeA/Qo3kaSZPc3ZAEVkLerrUXFZYXpfWAJ9L6ck3u+78Mx",
+          "TFfGh3d9w93lRkNbN80NDOND6NtmzdsQa9zbXE2DAoGADFdImRhY14pfoWpxT3Bb",
+          "RymMlh+yj50KFM/ExnV/ombpS+7ZpXn/myvsQz/9bGt+ozqIJp6WSXgRlcdqFyc+",
+          "B4dfgeSEhh/5iGC3Dlq/+9TVHJW3K2oBFkyyeA5EBFdtSlR9eK9palWKWezW9VwU",
+          "eIso5NKpXcAVuKw9GWMTvgg=",
+          "-----END PRIVATE KEY-----"
+        ],
+        "server_name": "christianmckemie.com"
+      },
+      "type": "tuic",
+      "users": [
+        {
+          "name": "OUSS",
+          "uuid": "ad44080a-4bdb-4d39-841a-b7361724f8bc",
+          "password": "mT2mcMGJDs"
+        }
+      ],
+      "zero_rtt_handshake": true
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "direct",
+      "type": "direct"
+    },
+    {
+      "server": "127.0.0.1",
+      "server_port": 40000,
+      "tag": "WarpSocks出口",
+      "type": "socks",
+      "version": "5"
+    }
+  ],
+  "services": null,
+  "endpoints": null,
+  "route": {
     "rules": [
       {
         "action": "sniff"
@@ -188,3 +507,6 @@
       }
     ],
     "final": "direct"
+  },
+  "experimental": {}
+}
