@@ -1,3 +1,5 @@
+https://raw.githubusercontent.com/adwzlad/AAcustom/main/S-UI/s-ui.json
+
 Debian/Ubuntu 系统清理
 
 bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/clean-debian.sh)
