@@ -17,11 +17,7 @@
           "geoip-cloudflare",
           "geosite-google",
           "geoip-google",
-          "geosite-proxy",
-          "geosite-wechat",
-          "geoip-wechat",
-          "geosite-cn",
-          "geoip-cn"
+          "geosite-proxy"
         ],
         "rule_set_ip_cidr_match_source": false,
         "action": "route",
@@ -36,6 +32,9 @@
           "geosite-tiktok",
           "geosite-netflix",
           "geoip-netflix",
+          "geosite-TVB",
+          "geosite-wechat",
+          "geoip-wechat",
           "geosite-paypal"
         ],
         "rule_set_ip_cidr_match_source": false,
@@ -185,6 +184,14 @@
         "tag": "geoip-cloudflare",
         "format": "binary",
         "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo-lite/geoip/cloudflare.srs",
+        "download_detour": "direct",
+        "update_interval": "2d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-TVB",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/tvb.srs",
         "download_detour": "direct",
         "update_interval": "2d"
       }
