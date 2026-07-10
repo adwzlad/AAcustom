@@ -1,3 +1,5 @@
+S-UI面板路由列表使用，要先设置此配置中的  WarpSocks出口  （在出站管理中设置）
+
 https://raw.githubusercontent.com/adwzlad/AAcustom/main/S-UI/s-ui.json
 
 Debian/Ubuntu 系统清理
