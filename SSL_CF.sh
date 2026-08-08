@@ -1,23 +1,22 @@
-```bash
 #!/bin/bash
 
 # ==================================================
 # Cloudflare DNS + acme.sh
 #
-# 支持两种证书申请模式：
-#
+# 支持：
 # 1. 主域名 + *.通配符（原有模式）
-# 2. 指定多个域名（新增模式）
+# 2. 多个指定域名（新增模式）
 #
-# 原有功能全部保留：
+# 原有功能：
 # - Cloudflare DNS-01
 # - Let's Encrypt
 # - 自动缓存参数
-# - ECC P-256 优先
-# - ECC 失败自动切换 RSA 4096
+# - ECC-256 优先
+# - ECC 失败自动 RSA-4096
 # - 证书安装到 /root/cert/
-# - 自动安装 acme.sh 定时任务
-# - 原有配置文件兼容
+# - 自动续期
+# - 自动更新证书文件
+# - 旧版配置兼容
 #
 # ==================================================
 
@@ -43,24 +42,24 @@ mkdir -p "$CONF_DIR" "$CERT_DIR"
 
 
 # ==================================================
-# 域名验证
+# 域名格式检查
 # ==================================================
 
 validate_domain() {
 
     local domain="$1"
 
-    # 基本域名格式检查
-    if [[ ! "$domain" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$ ]]; then
-        return 1
+    # 允许普通域名
+    if [[ "$domain" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$ ]]; then
+        return 0
     fi
 
-    return 0
+    return 1
 }
 
 
 # ==================================================
-# 新配置
+# 新建配置
 # ==================================================
 
 configure_new() {
@@ -78,6 +77,7 @@ configure_new() {
         exit 1
     fi
 
+
     echo
     echo "请选择证书申请模式："
     echo
@@ -91,7 +91,13 @@ configure_new() {
 
         case "$CERT_MODE" in
 
+            # ==================================================
+            # 模式 1
+            # 原来的 DOMAIN + *.DOMAIN
+            # ==================================================
+
             1)
+
                 echo
                 read -p "请输入主域名 (如 example.com): " DOMAIN
 
@@ -100,17 +106,20 @@ configure_new() {
                     continue
                 fi
 
-                # 原有模式
-                # 自动申请：
-                # example.com
-                # *.example.com
-
+                # 原有行为
                 DOMAINS="$DOMAIN *.$DOMAIN"
 
                 break
                 ;;
 
+
+            # ==================================================
+            # 模式 2
+            # 多个指定域名
+            # ==================================================
+
             2)
+
                 echo
                 echo "请输入需要申请的域名。"
                 echo "每行输入一个域名。"
@@ -133,25 +142,31 @@ configure_new() {
                         break
                     fi
 
+
                     if ! validate_domain "$INPUT_DOMAIN"; then
-                        echo "[WARN] 域名格式不正确，已跳过：$INPUT_DOMAIN"
+                        echo "[WARN] 域名格式不正确，跳过：$INPUT_DOMAIN"
                         continue
                     fi
 
-                    # 防止重复
+
+                    # 检查重复
                     DUPLICATE=0
 
                     for EXISTING_DOMAIN in "${DOMAIN_LIST[@]}"; do
+
                         if [ "$EXISTING_DOMAIN" = "$INPUT_DOMAIN" ]; then
                             DUPLICATE=1
                             break
                         fi
+
                     done
 
+
                     if [ "$DUPLICATE" -eq 1 ]; then
-                        echo "[WARN] 域名已存在，跳过：$INPUT_DOMAIN"
+                        echo "[WARN] 域名已经存在，跳过：$INPUT_DOMAIN"
                         continue
                     fi
+
 
                     DOMAIN_LIST+=("$INPUT_DOMAIN")
 
@@ -159,19 +174,22 @@ configure_new() {
 
                 done
 
+
                 if [ "${#DOMAIN_LIST[@]}" -eq 0 ]; then
                     echo "[ERROR] 至少需要输入一个域名"
                     continue
                 fi
 
-                # 第一个域名作为 acme.sh 证书标识
+
+                # 第一个域名作为 acme.sh 证书主标识
                 DOMAIN="${DOMAIN_LIST[0]}"
 
-                # 转换成空格分隔保存
+                # 保存为空格分隔
                 DOMAINS="${DOMAIN_LIST[*]}"
 
                 break
                 ;;
+
 
             *)
                 echo "[ERROR] 请输入 1 或 2"
@@ -191,9 +209,11 @@ configure_new() {
     fi
 
 
-    # ---------- 保存配置 ----------
+    # ==================================================
+    # 保存配置
+    # ==================================================
 
-    cat >"$CONF_FILE" <<EOF
+    cat > "$CONF_FILE" <<EOF
 export CF_Token="$CF_Token"
 export DOMAIN="$DOMAIN"
 export DOMAINS="$DOMAINS"
@@ -217,27 +237,26 @@ if [ -f "$CONF_FILE" ]; then
     source "$CONF_FILE"
 
     echo
-    echo "===================================="
-    echo " 已发现缓存配置"
-    echo "===================================="
-    echo
-    echo "配置文件：$CONF_FILE"
+    echo "[INFO] 已读取缓存配置：$CONF_FILE"
     echo
 
-    # ------------------------------------------------
-    # 兼容旧版本配置
+
+    # ==================================================
+    # 兼容原来的旧配置
     #
-    # 旧版本只有：
+    # 原脚本只有：
+    #
     # CF_Token
     # DOMAIN
     # ACME_EMAIL
     #
     # 没有 CERT_MODE / DOMAINS
     #
-    # 默认继续使用原来的：
+    # 所以自动按原模式处理：
+    #
     # DOMAIN
     # *.DOMAIN
-    # ------------------------------------------------
+    # ==================================================
 
     if [ -z "${CERT_MODE:-}" ]; then
 
@@ -248,7 +267,7 @@ if [ -f "$CONF_FILE" ]; then
         fi
 
         echo "[INFO] 检测到旧版配置"
-        echo "[INFO] 将继续使用原有模式："
+        echo "[INFO] 自动使用原有模式："
         echo "       $DOMAIN"
         echo "       *.$DOMAIN"
         echo
@@ -256,30 +275,11 @@ if [ -f "$CONF_FILE" ]; then
     fi
 
 
-    # ------------------------------------------------
-    # 让用户选择是否使用缓存
-    #
-    # 默认 Enter = 使用缓存
-    # 因此原来的重复运行行为仍然保持。
-    # ------------------------------------------------
-
-    read -p "是否使用以上缓存配置？[Y/n]: " USE_CACHE
-
-    if [[ "$USE_CACHE" =~ ^[Nn]$ ]]; then
-
-        configure_new
-
-        # 重新读取配置
-        source "$CONF_FILE"
-
-    else
-
-        echo
-        echo "[INFO] 使用缓存配置"
-
-    fi
-
 else
+
+    # ==================================================
+    # 新主机
+    # ==================================================
 
     configure_new
 
@@ -287,7 +287,7 @@ fi
 
 
 # ==================================================
-# 再次读取配置
+# 重新读取配置
 # ==================================================
 
 source "$CONF_FILE"
@@ -299,14 +299,15 @@ source "$CONF_FILE"
 
 DOMAIN_LIST=()
 
+
 if [ "$CERT_MODE" = "1" ]; then
 
-    # ------------------------------------------------
-    # 原有模式
+    # ==================================================
+    # 原模式
     #
     # example.com
     # *.example.com
-    # ------------------------------------------------
+    # ==================================================
 
     if [ -z "${DOMAIN:-}" ]; then
         echo "[ERROR] DOMAIN 未配置"
@@ -318,13 +319,14 @@ if [ "$CERT_MODE" = "1" ]; then
         "*.$DOMAIN"
     )
 
+
 else
 
-    # ------------------------------------------------
+    # ==================================================
     # 新模式
     #
-    # 使用指定域名
-    # ------------------------------------------------
+    # 只申请指定域名
+    # ==================================================
 
     if [ -z "${DOMAINS:-}" ]; then
         echo "[ERROR] DOMAINS 未配置"
@@ -333,8 +335,9 @@ else
 
     read -r -a DOMAIN_LIST <<< "$DOMAINS"
 
+
     if [ "${#DOMAIN_LIST[@]}" -eq 0 ]; then
-        echo "[ERROR] 没有可用的域名"
+        echo "[ERROR] 没有可用域名"
         exit 1
     fi
 
@@ -342,7 +345,7 @@ fi
 
 
 # ==================================================
-# 显示最终申请域名
+# 显示本次证书域名
 # ==================================================
 
 echo
@@ -364,7 +367,8 @@ echo
 
 if [ ! -f /root/.acme.sh/acme.sh ]; then
 
-    echo "[INFO] 未检测到 acme.sh，开始安装..."
+    echo "[INFO] 未检测到 acme.sh"
+    echo "[INFO] 开始安装..."
 
     curl https://get.acme.sh | sh
 
@@ -387,20 +391,18 @@ fi
 
 
 # ==================================================
-# 注册 Let's Encrypt 账号
+# Let's Encrypt 注册
 # ==================================================
-
-echo "[INFO] 注册 / 检查 Let's Encrypt 账号..."
 
 /root/.acme.sh/acme.sh \
     --register-account \
     -m "$ACME_EMAIL" \
     --server letsencrypt \
-    >>"$LOG_FILE" 2>&1 || true
+    >> "$LOG_FILE" 2>&1 || true
 
 
 # ==================================================
-# 签发函数
+# 签发证书
 # ==================================================
 
 issue() {
@@ -411,26 +413,18 @@ issue() {
     echo "===================================="
     echo " 开始申请证书"
     echo "===================================="
-
-    echo "[INFO] Key 类型：$KEYLEN"
+    echo "[INFO] Key：$KEYLEN"
     echo
-
-    echo "[INFO] 申请域名："
-
-    for CERT_DOMAIN in "${DOMAIN_LIST[@]}"; do
-        echo "       $CERT_DOMAIN"
-    done
-
-    echo
-
 
     # ------------------------------------------------
-    # 构造 acme.sh 参数
+    # 构造域名参数
     # ------------------------------------------------
 
     local DOMAIN_ARGS=()
 
     for CERT_DOMAIN in "${DOMAIN_LIST[@]}"; do
+
+        echo "[INFO] 域名：$CERT_DOMAIN"
 
         DOMAIN_ARGS+=(
             -d "$CERT_DOMAIN"
@@ -439,8 +433,11 @@ issue() {
     done
 
 
+    echo
+
+
     # ------------------------------------------------
-    # 调用 acme.sh
+    # acme.sh
     # ------------------------------------------------
 
     /root/.acme.sh/acme.sh \
@@ -450,7 +447,7 @@ issue() {
         --keylength "$KEYLEN" \
         --server letsencrypt \
         --dnssleep 60 \
-        >>"$LOG_FILE" 2>&1
+        >> "$LOG_FILE" 2>&1
 
 }
 
@@ -469,8 +466,8 @@ if issue ec-256; then
 else
 
     echo
-    echo "[WARN] ECC 申请失败"
-    echo "[WARN] 切换 RSA 4096"
+    echo "[WARN] ECC-256 申请失败"
+    echo "[WARN] 自动切换 RSA-4096"
 
     if issue 4096; then
 
@@ -482,8 +479,8 @@ else
     else
 
         echo
-        echo "[ERROR] ECC 和 RSA 均申请失败"
-        echo "[ERROR] 请查看：$LOG_FILE"
+        echo "[ERROR] ECC-256 和 RSA-4096 均申请失败"
+        echo "[ERROR] 请查看日志：$LOG_FILE"
 
         exit 1
 
@@ -494,6 +491,16 @@ fi
 
 # ==================================================
 # 安装证书
+#
+# 这里非常重要：
+# --install-cert 会建立 acme.sh 的证书安装配置。
+#
+# 以后 acme.sh 自动续期成功后，
+# 会继续更新：
+#
+# /root/cert/private.key
+# /root/cert/public.crt
+#
 # ==================================================
 
 echo
@@ -503,13 +510,26 @@ echo "===================================="
 echo
 
 
-/root/.acme.sh/acme.sh \
-    --install-cert \
-    -d "$DOMAIN" \
-    --key-file "$CERT_DIR/private.key" \
-    --fullchain-file "$CERT_DIR/public.crt" \
-    ${CERT_SUFFIX:+--ecc} \
-    >>"$LOG_FILE" 2>&1
+if [ "$CERT_SUFFIX" = "_ecc" ]; then
+
+    /root/.acme.sh/acme.sh \
+        --install-cert \
+        -d "$DOMAIN" \
+        --ecc \
+        --key-file "$CERT_DIR/private.key" \
+        --fullchain-file "$CERT_DIR/public.crt" \
+        >> "$LOG_FILE" 2>&1
+
+else
+
+    /root/.acme.sh/acme.sh \
+        --install-cert \
+        -d "$DOMAIN" \
+        --key-file "$CERT_DIR/private.key" \
+        --fullchain-file "$CERT_DIR/public.crt" \
+        >> "$LOG_FILE" 2>&1
+
+fi
 
 
 # ==================================================
@@ -521,52 +541,77 @@ chmod 644 "$CERT_DIR/public.crt"
 
 
 # ==================================================
-# 自动续期
+# 安装自动续期 Cron
 # ==================================================
 
 echo "[INFO] 安装 acme.sh 自动续期任务..."
 
-/root/.acme.sh/acme.sh \
-    --install-cronjob \
-    >>"$LOG_FILE" 2>&1
+if /root/.acme.sh/acme.sh --install-cronjob >> "$LOG_FILE" 2>&1; then
 
-
-# ==================================================
-# 完成
-# ==================================================
-
-echo
-echo "===================================="
-echo "      ✅ 证书签发成功"
-echo "===================================="
-echo
-
-echo "申请模式："
-
-if [ "$CERT_MODE" = "1" ]; then
-
-    echo "  主域名 + 通配符"
+    echo "[INFO] 自动续期任务安装成功"
 
 else
 
-    echo "  指定域名"
+    echo "[WARN] 自动续期任务安装失败"
+    echo "[WARN] 请检查：$LOG_FILE"
 
 fi
 
+
+# ==================================================
+# 显示续期信息
+# ==================================================
+
 echo
-echo "证书域名："
+echo "===================================="
+echo " 自动续期配置"
+echo "===================================="
+echo
+
+echo "acme.sh："
+echo "  /root/.acme.sh/acme.sh"
+
+echo
+echo "证书安装目录："
+echo "  $CERT_DIR"
+
+echo
+echo "证书文件："
+echo "  $CERT_DIR/private.key"
+echo "  $CERT_DIR/public.crt"
+
+echo
+echo "日志："
+echo "  $LOG_FILE"
+
+echo
+echo "===================================="
+echo "       ✅ 证书签发成功"
+echo "===================================="
+echo
+
+
+# ==================================================
+# 显示最终域名
+# ==================================================
+
+echo "证书包含以下域名："
 
 for CERT_DOMAIN in "${DOMAIN_LIST[@]}"; do
     echo "  $CERT_DOMAIN"
 done
 
 echo
-echo "私钥: $CERT_DIR/private.key"
-echo "证书: $CERT_DIR/public.crt"
-echo "日志: $LOG_FILE"
-echo "配置: $CONF_FILE"
+
+
+# ==================================================
+# 显示 acme.sh 证书列表
+# ==================================================
+
+echo "当前 acme.sh 证书："
+echo
+
+/root/.acme.sh/acme.sh --list 2>/dev/null || true
 
 echo
 echo "===================================="
-echo
-```
