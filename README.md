@@ -20,6 +20,10 @@ CF通配符域名证书   申请失败/续签/重跑（不会再问任何问题�
 
 bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/SSL_CF_DNS1.sh)
 
+扩展版，支持非通配符域名证书
+
+bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/SSL_CF.sh)
+
 生成/usr/local/openresty/nginx/cloudflare_ips.conf，并定时更新
 
 bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/arm_openresty_cloudflare_ips.sh)
