@@ -1,41 +1,10 @@
 {
-  "version": 1,
+  "version": 4,
   "rules": [
     {
       "domain_suffix": [
-        "youjizz.com",
-        "pornhub.com",
-        "69vj.com",
-        "spankbang.com",
-        "recaptcha.net",
-        "airdroid.info",
-        "airdroid.cn",
-        "airdroid.com",
-        "fast.com",
-        "docker.com",
-        "ipaddress.com",
-        "speedtest.net",
         "v2rayssr.com",
-        "ipinfo.io",
-        "ipleak.net",
-        "debian.org",
-        "proxmox.com",
-        "ping0.cc",
-        "ip138.com",
-        "bdimg.com",
-        "ipchaxun.net",
-        "qichiyu.com",
-        "ip2location.io",
-        "test-ipv6.com",
-        "ipshudi.com",
-        "ip.sb",
-        "ipwho.is",
-        "ipapi.is",
-        "ipip.net",
-        "yhcqw.com",
-        "browserleaks.com",
-        "myip.com",
-        "baidu.com"
+        "qichiyu.com"
       ]
     }
   ]
