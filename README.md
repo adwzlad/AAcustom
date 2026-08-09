@@ -22,7 +22,7 @@ bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/SSL_CF_D
 
 扩展版，支持非通配符域名证书
 
-bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/SSL_CF.sh)
+bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/SSL_DNS_CF.sh)
 
 生成/usr/local/openresty/nginx/cloudflare_ips.conf，并定时更新
 
