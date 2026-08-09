@@ -1,0 +1,33 @@
+{
+  "version": 4,
+  "rules": [
+    {
+      "domain": [
+        "www.example.com"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "example.com",
+        "example.net"
+      ]
+    },
+    {
+      "domain_keyword": [
+        "google",
+        "youtube"
+      ]
+    },
+    {
+      "domain_regex": [
+        "^(.+\\.)?example\\.com$"
+      ]
+    },
+    {
+      "ip_cidr": [
+        "1.2.3.0/24",
+        "2001:db8::/32"
+      ]
+    }
+  ]
+}
