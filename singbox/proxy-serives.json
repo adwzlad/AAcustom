@@ -3,7 +3,8 @@
   "rules": [
     {
       "domain": [
-        "www.gstatic.com"
+        "www.gstatic.com",
+        "cp.cloudflare.com"
       ]
     },
     {
