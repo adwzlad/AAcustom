@@ -16,7 +16,6 @@
         "debian.org",
         "proxmox.com",
         "ping0.cc",
-        "bdimg.com",
         "ip138.com",
         "ipchaxun.net",
         "qichiyu.com",
@@ -32,7 +31,12 @@
         "myip.com",
         "chromestatus.com",
         "bdstatic.com",
-        "baidu.com"
+        "baidu.com"，
+        "bdimg.com"，
+        "bcebos.com"，
+        "bdimg.com"，
+        "bdimg.com"，
+        "bdimg.com"
       ]
     }
   ]
