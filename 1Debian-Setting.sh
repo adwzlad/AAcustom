@@ -81,19 +81,29 @@ change_locale() {
 # 5. 设置系统时区
 set_timezone() {
     echo "请选择时区："
-    echo "1. 台北（Asia/Taipei）"
-    echo "2. 香港（Asia/Hong_Kong）"
-    echo "3. 新加坡（Asia/Singapore）"
-    echo "4. 自动设置（基于公网 IP）"
-    read -p "选择时区 (1-4): " tz_choice
+    echo "1. 台北（Asia/Taipei UTC+8）"
+    echo "2. 香港（Asia/Hong_Kong UTC+8）"
+    echo "3. 新加坡（Asia/Singapore UTC+8）"
+    echo "4. 澳大利亚达尔文（Australia/Darwin UTC+9:30 无夏令时）"
+    echo "5. 自动设置（基于公网 IP）"
+    read -p "选择时区 (1-5): " tz_choice
 
     install_if_missing curl curl
 
     case $tz_choice in
-        1) timedatectl set-timezone Asia/Taipei ;;
-        2) timedatectl set-timezone Asia/Hong_Kong ;;
-        3) timedatectl set-timezone Asia/Singapore ;;
+        1)
+            timedatectl set-timezone Asia/Taipei
+            ;;
+        2)
+            timedatectl set-timezone Asia/Hong_Kong
+            ;;
+        3)
+            timedatectl set-timezone Asia/Singapore
+            ;;
         4)
+            timedatectl set-timezone Australia/Darwin
+            ;;
+        5)
             timezone=$(curl -s https://ipapi.co/timezone)
             if [ -n "$timezone" ]; then
                 timedatectl set-timezone "$timezone"
@@ -102,8 +112,14 @@ set_timezone() {
                 echo "无法自动检测时区。"
             fi
             ;;
-        *) echo "无效选择。" ;;
+        *)
+            echo "无效选择。"
+            ;;
     esac
+
+    echo ""
+    echo "当前时区："
+    timedatectl | grep "Time zone"
 }
 
 # 6. 设置交换内存（swap）
