@@ -1,8 +1,12 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
+
+# ==============================
 # 自动安装依赖
+# ==============================
+
 install_if_missing() {
     if ! command -v "$1" &>/dev/null; then
         echo "正在安装 $1 ..."
@@ -11,6 +15,11 @@ install_if_missing() {
     fi
 }
 
+
+# ==============================
+# Root 检查
+# ==============================
+
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
         echo "请使用 root 权限运行此脚本"
@@ -18,139 +27,409 @@ check_root() {
     fi
 }
 
+
+# ==============================
+# 重启 SSH
+# ==============================
+
 restart_ssh() {
     echo "重启 SSH 服务..."
     systemctl restart ssh || systemctl restart sshd
 }
 
-# 1. 启用 root 密码登录
+
+# ==============================
+# 开启 root 登录
+# ==============================
+
 enable_root_login() {
+
     echo "开启 root 密码登录..."
-    sed -i "s/^#\?PermitRootLogin .*/PermitRootLogin yes/" /etc/ssh/sshd_config
-    sed -i "s/^#\?PasswordAuthentication .*/PasswordAuthentication yes/" /etc/ssh/sshd_config
+
+    grep -q "^PermitRootLogin" /etc/ssh/sshd_config \
+    && sed -i 's/^PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config \
+    || echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
+
+
+    grep -q "^PasswordAuthentication" /etc/ssh/sshd_config \
+    && sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config \
+    || echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
+
+
     restart_ssh
 }
 
-# 2. 修改账户密码
+
+# ==============================
+# 修改用户密码
+# ==============================
+
 change_user_password() {
+
     read -p "请输入要修改密码的用户名（默认 root）: " user
     user=${user:-root}
+
+
     if id "$user" &>/dev/null; then
-        read -p "请输入新密码（明文）: " newpass
+
+        read -p "请输入新密码: " newpass
+
         echo "$user:$newpass" | chpasswd
-        echo "密码已修改。"
-        restart_ssh
+
+        echo "密码修改完成"
+
     else
-        echo "用户 $user 不存在。"
+        echo "用户不存在"
     fi
 }
 
-# 3. 修改 SSH 端口
+
+
+# ==============================
+# 修改 SSH 端口
+# ==============================
+
 change_ssh_port() {
-    read -p "请输入要修改的 SSH 端口（默认 36098）: " port
+
+    read -p "请输入 SSH 端口（默认 36098）: " port
     port=${port:-36098}
-    sed -i "s/^#\?Port .*/Port $port/" /etc/ssh/sshd_config
-    echo "SSH 端口已修改为 $port"
+
+
+    grep -q "^Port" /etc/ssh/sshd_config \
+    && sed -i "s/^Port.*/Port $port/" /etc/ssh/sshd_config \
+    || echo "Port $port" >> /etc/ssh/sshd_config
+
+
+    echo "SSH 端口修改为 $port"
+
     restart_ssh
 }
 
-# 4. 修改系统语言
+
+
+# ==============================
+# 设置语言
+# ==============================
+
 change_locale() {
-    echo "请选择系统语言:"
-    echo "1. 英语（en_US.UTF-8）"
-    echo "2. 简体中文（zh_CN.UTF-8）"
-    echo "3. 繁体中文（zh_TW.UTF-8）"
-    read -p "选择语言 (1-3): " lang_choice
+
     install_if_missing locale locales
 
+
+    echo "请选择系统语言:"
+    echo "1. 英语 en_US.UTF-8"
+    echo "2. 简体中文 zh_CN.UTF-8"
+    echo "3. 繁体中文 zh_TW.UTF-8"
+
+
+    read -p "选择: " lang_choice
+
+
     case $lang_choice in
-        1) lang="en_US.UTF-8" ;;
-        2) lang="zh_CN.UTF-8" ;;
-        3) lang="zh_TW.UTF-8" ;;
-        *) echo "无效选择。"; return ;;
+
+        1)
+            lang="en_US.UTF-8"
+            ;;
+
+        2)
+            lang="zh_CN.UTF-8"
+            ;;
+
+        3)
+            lang="zh_TW.UTF-8"
+            ;;
+
+        *)
+            echo "错误"
+            return
+            ;;
     esac
 
-    echo "设置语言为 $lang"
-    sed -i "s/^# $lang/$lang/" /etc/locale.gen
+
+    sed -i "s/^# *$lang/$lang/" /etc/locale.gen
+
     echo "LANG=$lang" > /etc/default/locale
+
+
     locale-gen
+
     update-locale LANG=$lang
-    echo "语言设置完成。请重新登录以生效。"
+
+
+    echo "完成，请重新登录生效"
 }
 
-# 5. 设置系统时区
+
+
+# ==============================
+# 设置时区
+# ==============================
+
 set_timezone() {
-    echo "请选择时区："
-    echo "1. 台北（Asia/Taipei）"
-    echo "2. 香港（Asia/Hong_Kong）"
-    echo "3. 新加坡（Asia/Singapore）"
-    echo "4. 自动设置（基于公网 IP）"
-    read -p "选择时区 (1-4): " tz_choice
+
+
+    echo "请选择时区:"
+    echo "1. Asia/Taipei"
+    echo "2. Asia/Hong_Kong"
+    echo "3. Asia/Singapore"
+    echo "4. Australia/Darwin"
+    echo "5. 自动检测"
+
+
+    read -p "选择: " tz_choice
+
 
     install_if_missing curl curl
 
+
     case $tz_choice in
-        1) timedatectl set-timezone Asia/Taipei ;;
-        2) timedatectl set-timezone Asia/Hong_Kong ;;
-        3) timedatectl set-timezone Asia/Singapore ;;
+
+        1)
+            timedatectl set-timezone Asia/Taipei
+            ;;
+
+        2)
+            timedatectl set-timezone Asia/Hong_Kong
+            ;;
+
+        3)
+            timedatectl set-timezone Asia/Singapore
+            ;;
+
         4)
+            timedatectl set-timezone Australia/Darwin
+            ;;
+
+        5)
+
             timezone=$(curl -s https://ipapi.co/timezone)
+
             if [ -n "$timezone" ]; then
                 timedatectl set-timezone "$timezone"
-                echo "已自动设置时区为 $timezone"
-            else
-                echo "无法自动检测时区。"
             fi
             ;;
-        *) echo "无效选择。" ;;
+
+        *)
+            echo "错误"
+            ;;
     esac
+
+
+    timedatectl | grep "Time zone"
 }
 
-# 6. 设置交换内存（swap）
+
+
+
+# ==============================
+# Swap 管理
+# ==============================
+
 enable_swap() {
-    read -p "请输入要设置的交换内存大小（单位 GB，例如 2）: " swapsize
-    if [[ "$swapsize" =~ ^[0-9]+$ ]]; then
-        swapsize_mb=$((swapsize * 1024))
+
+
+    echo ""
+    echo "当前 Swap 状态:"
+    free -h
+
+    swapon --show || true
+
+    echo ""
+
+
+    read -p "输入交换内存大小 GB（0关闭）: " swapsize
+
+
+
+    # ----------
+    # 关闭 swap
+    # ----------
+
+    if [[ "$swapsize" == "0" ]]; then
+
+
+        echo "关闭所有 swap..."
+
+
+        swap_list=$(swapon --show=NAME --noheadings || true)
+
+
+        if [ -n "$swap_list" ]; then
+
+            while read -r swapfile; do
+
+                echo "关闭 $swapfile"
+
+                swapoff "$swapfile" || true
+
+            done <<< "$swap_list"
+
+        fi
+
+
+
+        echo "清理 fstab..."
+
+        sed -i \
+        -e '\|/swapfile|d' \
+        -e '\|/swap.img|d' \
+        /etc/fstab
+
+
+
+        echo "Swap 已永久关闭"
+
+        free -h
+
+        return
+
+    fi
+
+
+
+    # ----------
+    # 创建 swap
+    # ----------
+
+
+    if [[ "$swapsize" =~ ^[0-9]+$ ]] && [ "$swapsize" -le 64 ]; then
+
+
         swapfile="/swapfile"
-        echo "创建 ${swapsize}G 交换内存..."
-        fallocate -l "${swapsize_mb}M" "$swapfile" || dd if=/dev/zero of="$swapfile" bs=1M count="$swapsize_mb"
+
+
+        echo "创建 ${swapsize}G swap"
+
+
+
+        swapoff -a || true
+
+
+
+        rm -f /swapfile /swap.img
+
+
+
+        sed -i \
+        -e '\|/swapfile|d' \
+        -e '\|/swap.img|d' \
+        /etc/fstab
+
+
+
+        dd if=/dev/zero \
+        of="$swapfile" \
+        bs=1M \
+        count=$((swapsize*1024)) \
+        status=progress
+
+
+
         chmod 600 "$swapfile"
+
+
+
         mkswap "$swapfile"
+
+
         swapon "$swapfile"
+
+
+
         echo "$swapfile none swap sw 0 0" >> /etc/fstab
-        echo "已设置并启用交换内存。"
+
+
+
+        echo "Swap 创建完成"
+
+        swapon --show
+
+        free -h
+
+
     else
-        echo "无效的数字输入。"
+
+        echo "输入错误"
+
     fi
 }
 
-# 主交互菜单
+
+
+
+# ==============================
+# 主菜单
+# ==============================
+
 main_menu() {
+
+
     check_root
-    while true; do
+
+
+    while true
+    do
+
         echo ""
-        echo "==== Debian 管理脚本 ===="
-        echo "1. 启用 root 密码登录"
-        echo "2. 修改账户密码"
+        echo "========== Debian/Ubuntu 管理脚本 =========="
+        echo "1. 开启 root 密码登录"
+        echo "2. 修改用户密码"
         echo "3. 修改 SSH 端口"
         echo "4. 修改系统语言"
-        echo "5. 设置系统时区"
-        echo "6. 设置交换内存"
+        echo "5. 设置时区"
+        echo "6. Swap 管理"
         echo "0. 退出"
-        read -p "请输入选项（可多项组合，如 123）: " choices
-        for choice in $(echo "$choices" | grep -o .); do
+
+
+        read -p "输入选项（支持组合，例如 123）: " choices
+
+
+
+        for choice in $(echo "$choices" | grep -o .)
+        do
+
             case $choice in
-                1) enable_root_login ;;
-                2) change_user_password ;;
-                3) change_ssh_port ;;
-                4) change_locale ;;
-                5) set_timezone ;;
-                6) enable_swap ;;
-                0) echo "退出。"; exit 0 ;;
-                *) echo "无效选项：$choice" ;;
+
+                1)
+                    enable_root_login
+                    ;;
+
+                2)
+                    change_user_password
+                    ;;
+
+                3)
+                    change_ssh_port
+                    ;;
+
+                4)
+                    change_locale
+                    ;;
+
+                5)
+                    set_timezone
+                    ;;
+
+                6)
+                    enable_swap
+                    ;;
+
+                0)
+                    exit 0
+                    ;;
+
+                *)
+                    echo "无效选项"
+                    ;;
+
             esac
+
         done
+
     done
+
 }
+
+
 
 main_menu
