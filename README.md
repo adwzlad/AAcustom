@@ -8,7 +8,11 @@ bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/clean-de
 
 ubuntu26 snap清理
 
-bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/ubuntu-remove-snap.shh)
+bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/ubuntu-remove-snap.sh)
+
+OCI ARM使用自制的救砖包后要执行一次
+
+bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/ubuntu-restore-init.sh)
 
 更换系统语言、修改时区/密码/SSH
 
