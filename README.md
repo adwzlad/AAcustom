@@ -6,6 +6,8 @@ Debian/Ubuntu 系统清理
 
 bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/clean-debian.sh)
 
+ubuntu26 snap清理
+
 bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/ubuntu-remove-snap.shh)
 
 更换系统语言、修改时区/密码/SSH
