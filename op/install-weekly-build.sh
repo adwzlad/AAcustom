@@ -14,27 +14,26 @@ set -euo pipefail
 #
 #   1. 检查 op 用户，不存在则创建普通用户 op
 #   2. 检查 /home/op/immortalwrt
-#      不存在则由 op 用户自动 clone ImmortalWrt
-#   3. 安装 ImmortalWrt 官方编译依赖
+#      不存在则由 op 用户自动 clone
+#   3. 安装 ImmortalWrt 编译依赖
 #   4. 安装 tmux / cron
 #   5. 检查所有需要的程序
 #   6. 从 GitHub 下载三个编译脚本
 #   7. 设置脚本权限和所有者
 #   8. 配置 op 用户每周一次的 cron
-#   9. 最终进行完整环境检查
+#   9. 最终检查
 #
 # 注意：
 #
-#   root 只负责：
-#     - 安装软件
-#     - 创建用户
-#     - 准备源码
-#     - 部署脚本
-#     - 配置 cron
+#   root 只负责部署。
 #
 #   ImmortalWrt 编译始终由普通用户 op 执行。
 #
-#   本脚本不会产生编译日志文件。
+#   不生成编译日志文件。
+#
+#   不检查硬盘空间。
+#   因为已有正常的 ImmortalWrt 源码时，
+#   不应该因为剩余空间低于官方建议值而阻止部署。
 # ============================================================
 
 
@@ -57,7 +56,15 @@ LAUNCHER_SCRIPT="$OP_HOME/weekly-build-launcher.sh"
 
 RUNNING_FILE="$OP_HOME/.weekly-build.running"
 
-# 每周日 03:00
+# ============================================================
+# 每周执行时间
+#
+# 这里是：
+#   每周日 03:00
+#
+# 如果以后需要修改，只改这里即可。
+# ============================================================
+
 CRON_SCHEDULE="0 3 * * 0"
 
 CRON_MARK="# ImmortalWrt weekly build - AAcustom"
@@ -94,7 +101,7 @@ if [ "$(id -u)" -ne 0 ]; then
     error "此部署脚本必须由 root 执行。"
 
     echo
-    echo "请执行："
+    echo "请使用："
     echo
     echo "  sudo bash $0"
     echo
@@ -104,6 +111,16 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 ok "当前用户：root"
+
+
+# ============================================================
+# 设置 PATH
+#
+# cron 环境 PATH 比较简单。
+# 这里部署脚本本身使用完整系统 PATH。
+# ============================================================
+
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 
 # ============================================================
@@ -124,28 +141,28 @@ fi
 case "${ID:-}" in
 
     debian)
+
         ok "操作系统：${PRETTY_NAME:-Debian}"
+
         ;;
 
     ubuntu)
+
         ok "操作系统：${PRETTY_NAME:-Ubuntu}"
+
         ;;
 
     *)
+
         error "本脚本只支持 Debian / Ubuntu。"
+
         error "当前系统：${PRETTY_NAME:-unknown}"
 
         exit 1
+
         ;;
 
 esac
-
-
-# ============================================================
-# 检查 root 的 PATH
-# ============================================================
-
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 
 # ============================================================
@@ -165,12 +182,12 @@ fi
 # 检查 op 用户
 #
 # 不存在：
-#   自动创建普通用户 op
+#   创建普通用户
 #
 # 已存在：
-#   保留现有用户
+#   不修改
 #
-# 不加入 sudo / wheel 等管理员组
+# 不加入 sudo / wheel。
 # ============================================================
 
 info "检查用户 $OP_USER ..."
@@ -196,59 +213,65 @@ fi
 
 
 # ============================================================
-# 确认 op HOME
+# 检查 op HOME
 # ============================================================
 
 REAL_HOME=$(getent passwd "$OP_USER" | cut -d: -f6)
 
+
 if [ "$REAL_HOME" != "$OP_HOME" ]; then
 
-    error "$OP_USER 的 HOME 不是 $OP_HOME"
+    error "$OP_USER 的 HOME 目录不是 $OP_HOME"
 
     error "当前 HOME：$REAL_HOME"
 
-    error "为了避免 cron / tmux / 编译目录出现问题，停止部署。"
+    error "为了避免 cron / tmux / 编译目录错误，停止部署。"
 
     exit 1
 
 fi
 
+
 ok "$OP_USER HOME：$OP_HOME"
 
 
 # ============================================================
-# 确认 op 是普通用户
-#
-# 不强制修改已有用户的 UID/GID。
-# 这里只检查它不是 root。
+# 确认 op 不是 root
 # ============================================================
 
 OP_UID=$(id -u "$OP_USER")
 
+
 if [ "$OP_UID" -eq 0 ]; then
 
     error "$OP_USER 的 UID 为 0。"
+
     error "$OP_USER 不能是 root 用户。"
 
     exit 1
 
 fi
 
+
 ok "$OP_USER UID：$OP_UID（普通用户）"
 
 
 # ============================================================
-# 确认 op 不属于 sudo / wheel
+# 检查管理员组
 #
-# 如果已有用户本来就拥有管理员权限，这里不强制删除，
-# 只给出提示。
+# 如果现有 op 已经属于 sudo / wheel，
+# 不自动删除已有权限，只进行警告。
+#
+# 新创建的 op 不会主动加入这些组。
 # ============================================================
 
 OP_GROUPS=$(id -nG "$OP_USER" 2>/dev/null || true)
 
+
 if echo "$OP_GROUPS" | grep -Eq '(^| )(sudo|wheel)( |$)'; then
 
     warn "$OP_USER 当前属于 sudo/wheel 管理员组。"
+
     warn "本脚本不会自动删除现有管理员权限。"
 
 else
@@ -259,19 +282,21 @@ fi
 
 
 # ============================================================
-# 确保 /home/op 所有权正确
+# 确保 HOME 本身属于 op
 #
-# 只处理 HOME 本身。
-# 不递归修改现有 ImmortalWrt 源码目录。
+# 注意：
+#   不递归修改 /home/op。
+#
+#   特别是不修改已有 immortalwrt 的所有权。
 # ============================================================
 
 chown "$OP_USER:$OP_USER" "$OP_HOME"
 
-ok "$OP_HOME 所有权正常"
+ok "$OP_HOME 所有权检查完成"
 
 
 # ============================================================
-# 安装 APT 软件包
+# 更新 APT
 # ============================================================
 
 export DEBIAN_FRONTEND=noninteractive
@@ -279,98 +304,18 @@ export DEBIAN_FRONTEND=noninteractive
 
 info "更新 APT 软件包索引..."
 
-apt-get update -y
 
-ok "APT 更新完成"
+apt-get update
+
+
+ok "APT 软件包索引更新完成"
 
 
 # ============================================================
-# ImmortalWrt 官方 Debian / Ubuntu 编译依赖
+# ImmortalWrt 编译依赖
 #
-# 来源：
-# ImmortalWrt 官方 README
-#
-# 当前官方列出的依赖：
-#
-# ack
-# antlr3
-# asciidoc
-# autoconf
-# automake
-# autopoint
-# binutils
-# bison
-# build-essential
-# bzip2
-# ccache
-# clang
-# cmake
-# cpio
-# curl
-# device-tree-compiler
-# ecj
-# fastjar
-# flex
-# gawk
-# gettext
-# gcc-multilib
-# g++-multilib
-# git
-# gnutls-dev
-# gperf
-# haveged
-# help2man
-# intltool
-# lib32gcc-s1
-# libc6-dev-i386
-# libelf-dev
-# libglib2.0-dev
-# libgmp3-dev
-# libltdl-dev
-# libmpc-dev
-# libmpfr-dev
-# libncurses-dev
-# libpython3-dev
-# libreadline-dev
-# libssl-dev
-# libtool
-# libyaml-dev
-# libz-dev
-# lld
-# llvm
-# lrzsz
-# mkisofs
-# msmtp
-# nano
-# ninja-build
-# p7zip
-# p7zip-full
-# patch
-# pkgconf
-# python3
-# python3-pip
-# python3-ply
-# python3-docutils
-# python3-pyelftools
-# qemu-utils
-# re2c
-# rsync
-# scons
-# squashfs-tools
-# subversion
-# swig
-# texinfo
-# uglifyjs
-# upx-ucl
-# unzip
-# vim
-# wget
-# xmlto
-# xxd
-# zlib1g-dev
-# zstd
+# 按 ImmortalWrt 官方 Debian / Ubuntu 编译环境准备。
 # ============================================================
-
 
 IMMORTALWRT_PACKAGES="
 ack
@@ -394,16 +339,11 @@ fastjar
 flex
 gawk
 gettext
-gcc-multilib
-g++-multilib
 git
-gnutls-dev
 gperf
 haveged
 help2man
 intltool
-lib32gcc-s1
-libc6-dev-i386
 libelf-dev
 libglib2.0-dev
 libgmp3-dev
@@ -454,16 +394,40 @@ zstd
 
 
 # ============================================================
-# 本自动编译方案额外需要的程序
+# amd64 专用依赖
+#
+# 只有 amd64 安装 multilib。
+#
+# ARM64 等架构不安装这些。
+# ============================================================
+
+ARCH=$(dpkg --print-architecture 2>/dev/null || uname -m)
+
+
+if [ "$ARCH" = "amd64" ]; then
+
+    IMMORTALWRT_PACKAGES="$IMMORTALWRT_PACKAGES
+gcc-multilib
+g++-multilib
+gnutls-dev
+lib32gcc-s1
+libc6-dev-i386
+"
+
+fi
+
+
+# ============================================================
+# 自动编译额外依赖
 #
 # tmux：
-#   专门用于查看编译过程
+#   编译过程专用 session
 #
 # cron：
-#   每周自动启动编译
+#   每周自动启动
 #
 # util-linux：
-#   提供 flock 等工具
+#   提供 flock
 # ============================================================
 
 AUTOMATION_PACKAGES="
@@ -474,20 +438,22 @@ util-linux
 
 
 # ============================================================
-# 安装依赖
+# 安装软件包
 # ============================================================
 
-info "安装 ImmortalWrt 编译依赖..."
+info "安装 ImmortalWrt 编译依赖和自动任务依赖..."
+
 
 apt-get install -y \
     $IMMORTALWRT_PACKAGES \
     $AUTOMATION_PACKAGES
 
-ok "所有 APT 依赖安装完成"
+
+ok "软件包安装完成"
 
 
 # ============================================================
-# 检查并启动 cron
+# 检查 cron 服务
 # ============================================================
 
 info "检查 cron 服务..."
@@ -498,6 +464,7 @@ if command -v systemctl >/dev/null 2>&1; then
     systemctl enable cron >/dev/null 2>&1 || true
 
     systemctl restart cron
+
 
     if systemctl is-active --quiet cron; then
 
@@ -516,7 +483,8 @@ if command -v systemctl >/dev/null 2>&1; then
 else
 
     warn "系统没有 systemctl。"
-    warn "无法自动检查 cron 服务状态。"
+
+    warn "无法自动确认 cron 服务状态。"
 
 fi
 
@@ -574,44 +542,64 @@ for CMD in $REQUIRED_COMMANDS; do
         case "$CMD" in
 
             git)
+
                 VERSION=$(git --version 2>/dev/null || true)
+
                 ;;
 
             tmux)
+
                 VERSION=$(tmux -V 2>/dev/null || true)
+
                 ;;
 
             make)
+
                 VERSION=$(make --version 2>/dev/null | head -1 || true)
+
                 ;;
 
             gcc)
+
                 VERSION=$(gcc --version 2>/dev/null | head -1 || true)
+
                 ;;
 
             g++)
+
                 VERSION=$(g++ --version 2>/dev/null | head -1 || true)
+
                 ;;
 
             clang)
+
                 VERSION=$(clang --version 2>/dev/null | head -1 || true)
+
                 ;;
 
             cmake)
+
                 VERSION=$(cmake --version 2>/dev/null | head -1 || true)
+
                 ;;
 
             python3)
+
                 VERSION=$(python3 --version 2>/dev/null || true)
+
                 ;;
 
             *)
+
                 VERSION=$(command -v "$CMD")
+
                 ;;
 
         esac
 
+
         printf '  [ OK ] %-15s %s\n' "$CMD" "$VERSION"
+
 
     else
 
@@ -627,6 +615,7 @@ done
 if [ -n "$MISSING_COMMANDS" ]; then
 
     error "以下程序仍然缺失："
+
     error "$MISSING_COMMANDS"
 
     exit 1
@@ -638,59 +627,22 @@ ok "所有关键程序检查通过"
 
 
 # ============================================================
-# 检查 CPU 架构
+# 显示 CPU / 内存 / Swap
+#
+# 不作为部署失败条件。
+#
+# 特别适合：
+#   1G RAM + 4G Swap
 # ============================================================
 
-ARCH=$(dpkg --print-architecture 2>/dev/null || uname -m)
+info "检查系统资源..."
 
-echo
-echo "CPU 架构：$ARCH"
-
-
-case "$ARCH" in
-
-    amd64)
-        ok "CPU 架构为 amd64"
-        ;;
-
-    arm64)
-        warn "当前 CPU 架构为 arm64。"
-        warn "ImmortalWrt 官方主要推荐 AMD64。"
-        warn "ARM64 可以尝试编译，但官方不提供兼容性保证。"
-        ;;
-
-    *)
-        warn "当前 CPU 架构为 $ARCH"
-        warn "不是 ImmortalWrt 官方主要推荐的 AMD64。"
-        ;;
-
-esac
-
-
-# ============================================================
-# 检查 CPU
-# ============================================================
 
 CPU_COUNT=$(nproc)
 
-echo "CPU 核心数：$CPU_COUNT"
-
-if [ "$CPU_COUNT" -lt 2 ]; then
-
-    warn "CPU 少于 2 核，编译速度可能较慢。"
-
-else
-
-    ok "CPU 核心数正常"
-
-fi
-
-
-# ============================================================
-# 检查内存
-# ============================================================
 
 MEMORY_KB=$(awk '/MemTotal:/ {print $2}' /proc/meminfo)
+
 
 MEMORY_GB=$(awk '
 BEGIN {
@@ -699,84 +651,107 @@ BEGIN {
 ')
 
 
-echo "内存：${MEMORY_GB} GiB"
+SWAP_KB=$(awk '
+/SwapTotal:/ {
+    print $2
+}
+' /proc/meminfo)
 
 
-MIN_MEMORY_KB=$((4 * 1024 * 1024))
-
-
-if [ "$MEMORY_KB" -lt "$MIN_MEMORY_KB" ]; then
-
-    warn "内存低于 ImmortalWrt 官方建议的 4 GiB。"
-    warn "当前：${MEMORY_GB} GiB"
-    warn "继续部署，但编译可能失败或非常慢。"
-
-else
-
-    ok "内存达到官方建议"
-
-fi
-
-
-# ============================================================
-# 检查磁盘空间
-# ============================================================
-
-AVAILABLE_KB=$(df -Pk "$OP_HOME" | awk 'NR==2 {print $4}')
-
-AVAILABLE_GB=$(awk '
+SWAP_GB=$(awk '
 BEGIN {
-    printf "%.1f", '"$AVAILABLE_KB"' / 1024 / 1024
+    printf "%.1f", '"$SWAP_KB"' / 1024 / 1024
 }
 ')
 
 
-echo "可用磁盘空间：${AVAILABLE_GB} GiB"
+echo
+echo "CPU：${CPU_COUNT} 核"
+echo "内存：${MEMORY_GB} GiB"
+echo "Swap：${SWAP_GB} GiB"
+echo "架构：${ARCH}"
 
 
-MIN_DISK_KB=$((25 * 1024 * 1024))
+if [ "$MEMORY_KB" -lt $((4 * 1024 * 1024)) ]; then
 
+    warn "内存低于 ImmortalWrt 官方建议的 4 GiB。"
 
-if [ "$AVAILABLE_KB" -lt "$MIN_DISK_KB" ]; then
+    warn "当前内存：${MEMORY_GB} GiB"
 
-    error "可用磁盘空间不足 25 GiB。"
-    error "当前：${AVAILABLE_GB} GiB"
-
-    exit 1
+    warn "继续部署，不因为内存不足而退出。"
 
 else
 
-    ok "磁盘空间达到官方建议"
+    ok "内存达到官方建议值"
 
 fi
+
+
+if [ "$SWAP_KB" -eq 0 ]; then
+
+    warn "系统没有 Swap。"
+
+else
+
+    ok "Swap：${SWAP_GB} GiB"
+
+fi
+
+
+# ============================================================
+# 注意：
+#
+# 这里故意不检查磁盘空间。
+#
+# 不执行：
+#   df
+#
+# 不判断：
+#   25 GiB
+#
+# 原因：
+#
+#   用户已经存在一个可以正常编译的
+#   /home/op/immortalwrt。
+#
+#   当前剩余空间不足 25 GiB 不应该阻止
+#   自动部署。
+# ============================================================
+
+ok "跳过磁盘空间检查"
 
 
 # ============================================================
 # 检查 PATH
 #
-# ImmortalWrt 官方要求：
-# PATH 和工作目录不要包含空格或非 ASCII 字符。
+# ImmortalWrt 编译路径不建议包含空格或非 ASCII。
 # ============================================================
 
 case ":$PATH:" in
 
     *" "*)
+
         error "PATH 中存在空格。"
-        error "ImmortalWrt 官方要求避免这种情况。"
+
+        error "请先修正 PATH。"
+
         exit 1
+
         ;;
 
 esac
 
 
-if printf '%s' "$PATH" | LC_ALL=C grep -q '[^ -~]' ; then
+if printf '%s' "$PATH" | LC_ALL=C grep -q '[^ -~]'; then
 
     error "PATH 中存在非 ASCII 字符。"
-    error "ImmortalWrt 官方要求避免这种情况。"
+
+    error "请先修正 PATH。"
 
     exit 1
 
 fi
+
 
 ok "PATH 检查通过"
 
@@ -784,16 +759,27 @@ ok "PATH 检查通过"
 # ============================================================
 # 检查 ImmortalWrt 源码
 #
-# 情况：
+# 情况 1：
 #
-# 1. /home/op/immortalwrt 不存在
-#    → op 用户 clone
+#   /home/op/immortalwrt 不存在
 #
-# 2. 目录存在但不是 Git 仓库
-#    → 停止，不覆盖
+#   → 由 op 用户 clone
 #
-# 3. 已经是 Git 仓库
-#    → 直接使用
+#
+# 情况 2：
+#
+#   目录存在，但是不是 Git 仓库
+#
+#   → 停止
+#
+#
+# 情况 3：
+#
+#   已经是 Git 仓库
+#
+#   → 直接使用
+#
+# 不会覆盖已有源码。
 # ============================================================
 
 info "检查 ImmortalWrt 源码目录..."
@@ -805,12 +791,14 @@ if [ ! -e "$IMMORTALWRT_DIR" ]; then
 
     info "开始由普通用户 $OP_USER clone..."
 
+
     runuser -u "$OP_USER" -- \
         git clone \
         --single-branch \
         --filter=blob:none \
         "$IMMORTALWRT_REPO" \
         "$IMMORTALWRT_DIR"
+
 
     ok "ImmortalWrt 源码 clone 完成"
 
@@ -826,7 +814,7 @@ elif [ ! -d "$IMMORTALWRT_DIR/.git" ]; then
 
     error "$IMMORTALWRT_DIR 已存在，但不是 Git 仓库。"
 
-    error "为了避免覆盖已有数据，部署停止。"
+    error "为了避免覆盖已有数据，停止部署。"
 
     exit 1
 
@@ -839,58 +827,101 @@ fi
 
 
 # ============================================================
-# 检查源码目录权限
+# 检查 op 是否可以读写源码
 # ============================================================
 
-if ! runuser -u "$OP_USER" -- test -r "$IMMORTALWRT_DIR"; then
+if ! runuser -u "$OP_USER" -- \
+    test -r "$IMMORTALWRT_DIR"; then
 
-    error "$OP_USER 无法读取 $IMMORTALWRT_DIR"
+    error "$OP_USER 无法读取：$IMMORTALWRT_DIR"
 
     exit 1
 
 fi
 
 
-if ! runuser -u "$OP_USER" -- test -w "$IMMORTALWRT_DIR"; then
+if ! runuser -u "$OP_USER" -- \
+    test -w "$IMMORTALWRT_DIR"; then
 
-    error "$OP_USER 无法写入 $IMMORTALWRT_DIR"
+    error "$OP_USER 无法写入：$IMMORTALWRT_DIR"
 
-    error "请检查现有源码目录权限。"
+    error "请检查现有 ImmortalWrt 源码目录权限。"
 
     exit 1
 
 fi
 
 
-ok "$OP_USER 可以正常读写 ImmortalWrt 源码目录"
+ok "$OP_USER 可以读写 ImmortalWrt 源码"
 
 
 # ============================================================
-# 检查 Git remote
+# 检查 Git
 # ============================================================
 
-info "检查 ImmortalWrt Git remote..."
+info "检查 ImmortalWrt Git 状态..."
 
 
-REMOTE_URL=$(runuser -u "$OP_USER" -- \
-    git -C "$IMMORTALWRT_DIR" remote get-url origin 2>/dev/null || true)
+if ! runuser -u "$OP_USER" -- \
+    git -C "$IMMORTALWRT_DIR" rev-parse --is-inside-work-tree \
+    >/dev/null 2>&1; then
+
+    error "ImmortalWrt Git 仓库检查失败。"
+
+    exit 1
+
+fi
 
 
-if [ -z "$REMOTE_URL" ]; then
+CURRENT_BRANCH=$(
+    runuser -u "$OP_USER" -- \
+    git -C "$IMMORTALWRT_DIR" branch --show-current \
+    2>/dev/null || true
+)
 
-    warn "没有检测到 origin remote。"
 
-else
+CURRENT_COMMIT=$(
+    runuser -u "$OP_USER" -- \
+    git -C "$IMMORTALWRT_DIR" rev-parse --short HEAD \
+    2>/dev/null || true
+)
+
+
+echo "当前分支：${CURRENT_BRANCH:-（detached HEAD）}"
+echo "当前 Commit：${CURRENT_COMMIT:-unknown}"
+
+
+ok "ImmortalWrt Git 仓库正常"
+
+
+# ============================================================
+# 检查 Git origin
+# ============================================================
+
+REMOTE_URL=$(
+    runuser -u "$OP_USER" -- \
+    git -C "$IMMORTALWRT_DIR" remote get-url origin \
+    2>/dev/null || true
+)
+
+
+if [ -n "$REMOTE_URL" ]; then
 
     echo "origin：$REMOTE_URL"
 
-    ok "Git origin 检查完成"
+    ok "Git origin 存在"
+
+else
+
+    warn "没有检测到 Git origin。"
+
+    warn "现有源码仍然保留，但后续 weekly-build.sh 的 git fetch 可能失败。"
 
 fi
 
 
 # ============================================================
-# 下载 GitHub 上的三个脚本
+# 下载 GitHub 上的三个自动编译脚本
 # ============================================================
 
 info "从 GitHub 下载最新自动编译脚本..."
@@ -900,7 +931,9 @@ TMP_DIR=$(mktemp -d)
 
 
 cleanup_tmp() {
+
     rm -rf "$TMP_DIR"
+
 }
 
 
@@ -926,7 +959,7 @@ ok "三个 GitHub 脚本下载成功"
 
 
 # ============================================================
-# 检查 Shell 语法
+# Shell 语法检查
 # ============================================================
 
 info "检查三个 Shell 脚本语法..."
@@ -939,16 +972,18 @@ bash -n "$TMP_DIR/weekly-build-run.sh"
 bash -n "$TMP_DIR/weekly-build-launcher.sh"
 
 
-ok "三个脚本 Shell 语法检查通过"
+ok "三个脚本语法检查通过"
 
 
 # ============================================================
-# 安装脚本
+# 安装三个脚本
 #
-# 如果原来存在旧版本：
-#   先备份
+# 已存在：
+#   自动备份
 #
-# 不会删除旧文件。
+# 新文件：
+#   0755
+#   op:op
 # ============================================================
 
 TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
@@ -963,6 +998,7 @@ do
     SOURCE="$TMP_DIR/$FILE"
 
     TARGET="$OP_HOME/$FILE"
+
 
     if [ -f "$TARGET" ]; then
 
@@ -987,34 +1023,11 @@ do
 done
 
 
-ok "三个脚本安装完成"
+ok "三个自动编译脚本安装完成"
 
 
 # ============================================================
-# 再次检查脚本权限
-# ============================================================
-
-if [ ! -x "$BUILD_SCRIPT" ]; then
-    error "$BUILD_SCRIPT 不可执行"
-    exit 1
-fi
-
-if [ ! -x "$RUN_SCRIPT" ]; then
-    error "$RUN_SCRIPT 不可执行"
-    exit 1
-fi
-
-if [ ! -x "$LAUNCHER_SCRIPT" ]; then
-    error "$LAUNCHER_SCRIPT 不可执行"
-    exit 1
-fi
-
-
-ok "三个脚本均可执行"
-
-
-# ============================================================
-# 检查脚本所有者
+# 检查脚本
 # ============================================================
 
 for FILE in \
@@ -1023,7 +1036,26 @@ for FILE in \
     "$LAUNCHER_SCRIPT"
 do
 
+    if [ ! -f "$FILE" ]; then
+
+        error "文件不存在：$FILE"
+
+        exit 1
+
+    fi
+
+
+    if [ ! -x "$FILE" ]; then
+
+        error "文件不可执行：$FILE"
+
+        exit 1
+
+    fi
+
+
     OWNER=$(stat -c '%U:%G' "$FILE")
+
 
     if [ "$OWNER" != "$OP_USER:$OP_USER" ]; then
 
@@ -1036,21 +1068,27 @@ do
 done
 
 
-ok "三个脚本所有者均为 op:op"
+ok "三个脚本权限和所有者正常"
 
 
 # ============================================================
 # 配置 op 用户 crontab
 #
-# 只删除本脚本之前管理的那一条任务。
+# 只删除：
 #
-# 不影响 op 用户其他 cron。
+#   本脚本之前管理的任务
+#
+# 不影响：
+#
+#   op 用户自己的其他 cron。
 # ============================================================
 
 info "配置 $OP_USER 用户 crontab..."
 
 
-CURRENT_CRONTAB=$(crontab -u "$OP_USER" -l 2>/dev/null || true)
+CURRENT_CRONTAB=$(
+    crontab -u "$OP_USER" -l 2>/dev/null || true
+)
 
 
 NEW_CRONTAB=$(
@@ -1061,7 +1099,7 @@ NEW_CRONTAB=$(
 )
 
 
-# 删除连续空行
+# 删除空行
 NEW_CRONTAB=$(
     printf '%s\n' "$NEW_CRONTAB" \
     | sed '/^[[:space:]]*$/d'
@@ -1069,11 +1107,14 @@ NEW_CRONTAB=$(
 
 
 if [ -n "$NEW_CRONTAB" ]; then
+
     NEW_CRONTAB="${NEW_CRONTAB}"$'\n'
+
 fi
 
 
 NEW_CRONTAB="${NEW_CRONTAB}${CRON_MARK}"$'\n'
+
 NEW_CRONTAB="${NEW_CRONTAB}${CRON_SCHEDULE} ${LAUNCHER_SCRIPT}"$'\n'
 
 
@@ -1085,7 +1126,7 @@ ok "$OP_USER crontab 配置完成"
 
 
 # ============================================================
-# 检查 crontab
+# 显示最终 crontab
 # ============================================================
 
 echo
@@ -1093,14 +1134,17 @@ echo "============================================================"
 echo "$OP_USER 当前 crontab"
 echo "============================================================"
 
+
 crontab -u "$OP_USER" -l
 
 
 # ============================================================
-# 检查 tmux 是否可以由 op 正常运行
+# 测试 op 用户运行 tmux
 #
-# 这里不创建正式的 op session。
-# 只测试 tmux 本身。
+# 这里只测试 tmux 程序。
+#
+# 不创建正式的 tmux op 编译 session。
+# 不启动编译。
 # ============================================================
 
 info "测试 op 用户 tmux..."
@@ -1110,21 +1154,27 @@ runuser -u "$OP_USER" -- \
     tmux -V
 
 
+ok "op 用户可以使用 tmux"
+
+
 # ============================================================
-# 检查 op 用户能够执行 launcher
+# 测试 op 用户 Shell 脚本
 #
-# 只进行 Shell 语法和权限测试。
-# 不在部署过程中启动编译。
+# 只进行 bash -n。
+#
+# 不启动实际编译。
 # ============================================================
 
-info "检查 op 用户编译脚本..."
+info "测试 op 用户自动编译脚本..."
 
 
 runuser -u "$OP_USER" -- \
     bash -n "$BUILD_SCRIPT"
 
+
 runuser -u "$OP_USER" -- \
     bash -n "$RUN_SCRIPT"
+
 
 runuser -u "$OP_USER" -- \
     bash -n "$LAUNCHER_SCRIPT"
@@ -1134,72 +1184,113 @@ ok "op 用户脚本检查通过"
 
 
 # ============================================================
-# 最终显示
+# 检查 running 文件
+#
+# 如果旧的状态文件存在：
+#
+#   不删除
+#
+# 因为它可能代表当前正在运行的编译。
+#
+# 由 weekly-build-launcher.sh 自己判断 PID。
+# ============================================================
+
+if [ -f "$RUNNING_FILE" ]; then
+
+    warn "发现已有运行状态文件：$RUNNING_FILE"
+
+    warn "部署脚本不会删除它。"
+
+else
+
+    ok "没有发现旧的编译运行状态文件"
+
+fi
+
+
+# ============================================================
+# 最终信息
 # ============================================================
 
 echo
 echo
 echo "============================================================"
-echo "                 ImmortalWrt 自动编译部署完成"
+echo "          ImmortalWrt 自动编译环境部署完成"
 echo "============================================================"
+
 
 echo
 echo "运行用户："
 echo "  $OP_USER"
 
+
 echo
 echo "源码目录："
 echo "  $IMMORTALWRT_DIR"
+
 
 echo
 echo "编译脚本："
 echo "  $BUILD_SCRIPT"
 
+
 echo
 echo "运行脚本："
 echo "  $RUN_SCRIPT"
+
 
 echo
 echo "启动脚本："
 echo "  $LAUNCHER_SCRIPT"
 
-echo
-echo "tmux："
-echo "  $OP_USER 的专用 session：op"
 
 echo
-echo "定时任务："
+echo "tmux 专用 Session："
+echo "  op"
+
+
+echo
+echo "自动编译时间："
 echo "  每周日 03:00"
 
+
 echo
-echo "cron："
+echo "Cron："
 echo "  $CRON_SCHEDULE $LAUNCHER_SCRIPT"
+
 
 echo
 echo "============================================================"
 echo "手动立即启动一次编译："
 echo
 echo "  sudo -u op $LAUNCHER_SCRIPT"
-echo
 echo "============================================================"
+
 
 echo
 echo "查看编译过程："
 echo
 echo "  sudo -u op tmux attach-session -t op"
-echo
 echo "============================================================"
 
+
 echo
-echo "如果你已经切换到 op 用户，则直接："
+echo "如果已经切换到 op 用户："
 echo
 echo "  ~/weekly-build-launcher.sh"
 echo
 echo "  tmux attach-session -t op"
-echo
 echo "============================================================"
 
+
 echo
-echo "部署没有启动编译。"
-echo "第一次编译需要手动启动，或者等待下一次 cron。"
+echo "部署脚本没有启动编译。"
+echo "第一次编译可以手动启动，或者等待下一次 cron。"
 echo
+
+
+# ============================================================
+# 完成
+# ============================================================
+
+exit 0
