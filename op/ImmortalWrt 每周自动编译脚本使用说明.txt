@@ -1,0 +1,583 @@
+一、功能说明
+
+这套脚本用于在云主机上，以普通用户 op 的身份，每周自动执行一次 ImmortalWrt 编译。
+
+整体结构：
+
+root
+ │
+ └── 一键部署 install-weekly-build.sh
+          │
+          ├── 检查/创建 op 用户
+          ├── 检查 /home/op/immortalwrt
+          ├── 安装编译依赖
+          ├── 安装 tmux
+          ├── 安装 cron
+          └── 设置 op 用户的定时任务
+                         │
+                         ▼
+                op 用户 crontab
+                         │
+                    每周执行一次
+                         │
+                         ▼
+              weekly-build-launcher.sh
+                         │
+                         ▼
+                 检查 tmux op
+                    /          \
+                  有            无
+                  │              │
+                  │        创建 tmux op
+                  │              │
+                  └──────┬───────┘
+                         ▼
+                  tmux session: op
+                         │
+                         ▼
+                 weekly-build-run.sh
+                         │
+                         ▼
+               weekly-build.sh
+                         │
+                         ▼
+              /home/op/immortalwrt
+                         │
+                         ▼
+                  执行编译命令
+二、一键部署
+
+必须使用 root 执行。
+
+curl -fsSL https://raw.githubusercontent.com/adwzlad/AAcustom/main/op/install-weekly-build.sh -o /root/install-weekly-build.sh
+
+赋予执行权限：
+
+chmod +x /root/install-weekly-build.sh
+
+执行：
+
+bash /root/install-weekly-build.sh
+三、部署脚本会检查什么
+1. 检查 op 用户
+
+如果已经存在：
+
+op
+
+就直接使用。
+
+如果不存在，则自动创建：
+
+/home/op
+
+并使用：
+
+/bin/bash
+
+作为 Shell。
+
+2. 检查 ImmortalWrt 源码
+
+检查：
+
+/home/op/immortalwrt
+已存在并且是正常 Git 仓库
+
+直接使用。
+
+不会删除、不会重新 clone。
+
+不存在
+
+自动执行：
+
+git clone https://github.com/immortalwrt/immortalwrt /home/op/immortalwrt
+
+并由：
+
+op
+
+用户执行。
+
+存在但不是 Git 仓库
+
+部署停止，避免误覆盖已有文件。
+
+四、磁盘空间不检查
+
+这个版本不会检查磁盘剩余空间。
+
+也就是说，即使：
+
+剩余 20G
+剩余 15G
+剩余 10G
+
+都不会阻止部署。
+
+因为你的 /home/op/immortalwrt 已经正常完成过编译，部署脚本不应该强制要求 25G 可用空间。
+
+五、内存和 Swap
+
+脚本会显示：
+
+CPU
+内存
+Swap
+架构
+
+例如：
+
+CPU：4 核
+内存：1.0 GiB
+Swap：4.0 GiB
+架构：amd64
+
+即使只有：
+
+1 GiB RAM + 4 GiB Swap
+
+也不会因此停止部署。
+
+六、自动编译时间
+
+当前配置：
+
+0 3 * * 0
+
+表示：
+
+每周日凌晨 03:00 执行一次。
+
+时间按照主机系统的本地时区执行。
+
+查看主机时区：
+
+timedatectl
+
+如果需要修改执行时间，只需要修改部署脚本中的：
+
+CRON_SCHEDULE="0 3 * * 0"
+
+例如：
+
+每周日 01:00
+CRON_SCHEDULE="0 1 * * 0"
+每周一 03:00
+CRON_SCHEDULE="0 3 * * 1"
+每周六 04:30
+CRON_SCHEDULE="30 4 * * 6"
+七、定时任务属于谁？
+
+属于普通用户 op。
+
+查看：
+
+crontab -u op -l
+
+应该看到：
+
+# ImmortalWrt weekly build - AAcustom
+0 3 * * 0 /home/op/weekly-build-launcher.sh
+
+也可以切换到 op：
+
+su - op
+
+然后：
+
+crontab -l
+
+同样可以看到。
+
+不要去 root 的 crontab 里面找。
+
+八、为什么使用 tmux？
+
+自动编译专门使用：
+
+tmux session: op
+
+这样编译过程可以直接查看。
+
+即使 SSH 断开：
+
+SSH
+ ↓
+断开
+ ↓
+tmux
+ ↓
+编译继续
+
+不会因为 SSH 断开而终止编译。
+
+九、查看正在编译的过程
+
+切换到 op：
+
+su - op
+
+查看 tmux：
+
+tmux ls
+
+如果正在编译，应该能看到：
+
+op: 1 windows ...
+
+进入：
+
+tmux attach-session -t op
+
+或者：
+
+tmux attach -t op
+
+就可以看到完整的编译过程。
+
+十、退出 tmux，但不要停止编译
+
+进入 tmux 后：
+
+Ctrl + B
+
+然后按：
+
+D
+
+也就是：
+
+Ctrl+B
+D
+
+这叫 detach。
+
+效果：
+
+你退出 tmux
+      ↓
+编译继续
+      ↓
+SSH 可以直接退出
+
+下次再：
+
+tmux attach-session -t op
+
+就可以继续查看。
+
+十一、不要使用 Ctrl+C 退出
+
+如果你正在：
+
+tmux attach-session -t op
+
+里面看到编译过程：
+
+make ...
+
+此时按：
+
+Ctrl+C
+
+会把当前编译进程中断。
+
+如果只是想离开查看界面，请使用：
+
+Ctrl+B
+D
+十二、编译命令在哪里修改？
+
+自动编译命令集中放在：
+
+/home/op/weekly-build.sh
+
+以后如果要增加、删除、修改编译命令，主要修改这个文件最方便。
+
+例如：
+
+#!/bin/bash
+
+set -e
+
+cd /home/op/immortalwrt
+
+git stash push -u -m "临时保存本地修改" && git fetch origin && git reset --hard origin/master && git stash pop && git status
+
+./scripts/feeds update -a && ./scripts/feeds install -a
+
+make defconfig
+
+make download -j8
+
+make V=s -j$(nproc)
+
+命令按照从上到下执行。
+
+十三、命令执行顺序
+
+例如：
+
+git stash ...
+./scripts/feeds update -a ...
+make defconfig
+make download -j8
+make V=s -j$(nproc)
+
+不是同时执行。
+
+而是：
+
+第 1 条
+  ↓
+执行完成
+  ↓
+第 2 条
+  ↓
+执行完成
+  ↓
+第 3 条
+  ↓
+执行完成
+  ↓
+第 4 条
+  ↓
+执行完成
+  ↓
+第 5 条
+
+因此：
+
+make download -j8
+
+没有完成之前，不会进入：
+
+make V=s -j$(nproc)
+十四、为什么编译命令可以有任意行数？
+
+因为 weekly-build.sh 是普通 Shell 脚本。
+
+以后可以增加：
+
+make menuconfig
+
+或者：
+
+./scripts/feeds update -a
+
+或者其他命令。
+
+例如：
+
+cd /home/op/immortalwrt
+
+命令1
+
+命令2
+
+命令3
+
+命令4
+
+命令5
+
+命令6
+
+不需要修改定时任务。
+
+定时任务只负责启动脚本。
+
+十五、编译异常怎么办？
+
+这套方案的重要一点就是：
+
+不会因为一次编译异常，就让 cron 永久失效。
+
+下一周 cron 仍然会再次启动：
+
+周日
+ ↓
+launcher
+ ↓
+检查上一次编译状态
+ ↓
+确认没有正在运行
+ ↓
+启动新的 tmux op
+ ↓
+继续下一次编译
+
+所以即使某次：
+
+make
+
+失败，也不会导致整个每周任务消失。
+
+十六、如果服务器重启
+
+例如服务器突然重启：
+
+服务器
+ ↓
+重启
+ ↓
+原 tmux session 消失
+
+没关系。
+
+下一次 cron 执行时，启动脚本会检查：
+
+tmux op
+
+如果不存在，就重新创建。
+
+因此：
+
+重启
+ ↓
+tmux op 不存在
+ ↓
+cron 到时间
+ ↓
+创建 tmux op
+ ↓
+启动编译
+
+这正是这套方案的目的。
+
+十七、手动立即测试
+
+部署完成后，不需要等到周日。
+
+切换到 op：
+
+su - op
+
+执行：
+
+~/weekly-build-launcher.sh
+
+然后：
+
+tmux attach-session -t op
+
+即可查看编译。
+
+十八、检查定时任务
+crontab -u op -l
+
+或者：
+
+su - op
+crontab -l
+十九、检查 cron 服务
+systemctl status cron
+
+应该看到：
+
+Active: active (running)
+
+如果没有启动：
+
+systemctl enable --now cron
+二十、检查三个脚本
+ls -lh /home/op/weekly-build*.sh
+
+应该有：
+
+/home/op/weekly-build.sh
+/home/op/weekly-build-run.sh
+/home/op/weekly-build-launcher.sh
+
+检查权限：
+
+ls -l /home/op/weekly-build*.sh
+
+应该类似：
+
+-rwxr-xr-x op op ...
+二十一、检查源码目录
+ls -ld /home/op/immortalwrt
+
+检查 Git：
+
+su - op -c 'git -C /home/op/immortalwrt status'
+
+检查当前分支：
+
+su - op -c 'git -C /home/op/immortalwrt branch --show-current'
+
+检查当前 Commit：
+
+su - op -c 'git -C /home/op/immortalwrt rev-parse --short HEAD'
+二十二、手动查看 tmux 状态
+
+作为 op：
+
+tmux ls
+
+没有任务时可能：
+
+no server running on /tmp/tmux-1000/default
+
+这是正常的。
+
+因为 tmux op 是专门给自动编译使用的，编译结束后如果脚本退出，tmux session 可以不存在。
+
+有编译时才会看到：
+
+op: 1 windows ...
+二十三、这套方案的核心原则
+
+最终就是：
+
+                root
+                 │
+          只负责一次部署
+                 │
+                 ▼
+        ┌─────────────────┐
+        │     op 用户     │
+        └────────┬────────┘
+                 │
+                 ▼
+      /home/op/immortalwrt
+                 │
+                 ▼
+        op 用户 crontab
+                 │
+          每周一次
+                 │
+                 ▼
+      weekly-build-launcher.sh
+                 │
+           检查 tmux
+                 │
+                 ▼
+             tmux op
+                 │
+                 ▼
+       weekly-build-run.sh
+                 │
+                 ▼
+        weekly-build.sh
+                 │
+                 ▼
+     cd /home/op/immortalwrt
+                 │
+                 ▼
+       按顺序执行全部命令
+
+root 不参与实际编译。
+
+cron 任务属于 op。
+
+tmux session 叫 op。
+
+ImmortalWrt 编译属于 op。
+
+不生成额外日志文件，编译过程直接保留在 tmux 中查看。
+
+服务器重启后，下一次定时任务会自动重新创建 tmux op。
