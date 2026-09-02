@@ -1,13 +1,14 @@
 #!/bin/bash
 set -e
 
-VERSION="3.0"
+VERSION="3.1"
 
 INSTALL_DIR="/root/singbox"
-BIN="/usr/local/bin/sing-box"
 CONFIG="$INSTALL_DIR/config.json"
+ENV_FILE="$INSTALL_DIR/node.env"
 
 mkdir -p "$INSTALL_DIR"
+
 
 clear
 
@@ -20,20 +21,26 @@ echo " SSH bypass : 22"
 echo "================================"
 
 
+
 ARCH=$(uname -m)
 
 case "$ARCH" in
-    x86_64)
-        SB_ARCH="amd64"
-        ;;
-    aarch64|arm64)
-        SB_ARCH="arm64"
-        ;;
-    *)
-        echo "不支持架构: $ARCH"
-        exit 1
-        ;;
+
+x86_64)
+    SB_ARCH="amd64"
+    ;;
+
+aarch64|arm64)
+    SB_ARCH="arm64"
+    ;;
+
+*)
+    echo "不支持架构: $ARCH"
+    exit 1
+    ;;
+
 esac
+
 
 
 echo
@@ -50,81 +57,132 @@ if command -v sing-box >/dev/null 2>&1; then
     echo "发现已有 sing-box:"
     $BIN version | head -1
 
+
 else
+
+
+    BIN="/usr/local/bin/sing-box"
 
     echo
     echo "安装最新版 sing-box"
 
+
     TMP=$(mktemp -d)
 
-    URL=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest \
-    | grep browser_download_url \
-    | grep linux-${SB_ARCH} \
-    | head -1 \
-    | cut -d '"' -f4)
 
-    if [ -z "$URL" ]; then
-        echo "获取最新版失败"
-        exit 1
-    fi
+    TAG=$(curl -s \
+    https://api.github.com/repos/SagerNet/sing-box/releases/latest \
+    | jq -r '.tag_name')
 
 
-    wget -q "$URL" -O "$TMP/singbox.tar.gz"
+    FILE="sing-box-${TAG#v}-linux-${SB_ARCH}.tar.gz"
 
-    tar xf "$TMP/singbox.tar.gz" -C "$TMP"
 
-    cp $(find "$TMP" -name sing-box -type f | head -1) "$BIN"
+    wget -q \
+    "https://github.com/SagerNet/sing-box/releases/download/$TAG/$FILE" \
+    -O "$TMP/$FILE"
+
+
+    tar xf "$TMP/$FILE" -C "$TMP"
+
+
+    cp "$(find "$TMP" -name sing-box -type f | head -1)" "$BIN"
+
 
     chmod +x "$BIN"
+
 
 fi
 
 
 
 echo
-echo "请输入 anytls/tuic 节点URL:"
-read -r NODE_URL
+
+$BIN version | head -3
+
+
+
+echo
+
+read -rp "请输入 anytls/tuic 节点URL: " NODE_URL
+
 
 
 case "$NODE_URL" in
 
-    anytls://*)
-        TYPE="anytls"
-        ;;
+anytls://*)
+    TYPE="anytls"
+    ;;
 
-    tuic://*)
-        TYPE="tuic"
-        ;;
+tuic://*)
+    TYPE="tuic"
+    ;;
 
-    *)
-        echo "只支持 anytls:// 和 tuic://"
-        exit 1
-        ;;
+*)
+    echo "只支持 anytls:// 和 tuic://"
+    exit 1
+    ;;
 
 esac
 
 
 
 echo
+
 echo "解析节点..."
+
+
 
 TMPURL="${NODE_URL#*://}"
 
-NODE_MAIN="${TMPURL%%#*}"
+NO_HASH="${TMPURL%%#*}"
 
-AUTH_HOST="${NODE_MAIN%@*}"
+AUTH_HOST="${NO_HASH%@*}"
 
-SERVER_PORT="${NODE_MAIN#*@}"
+SERVER_PORT="${NO_HASH#*@}"
+
+
 
 SERVER="${SERVER_PORT%%:*}"
 
-PORT_QUERY="${SERVER_PORT#*:}"
+PORT_TMP="${SERVER_PORT#*:}"
 
-PORT="${PORT_QUERY%%\?*}"
+PORT="${PORT_TMP%%\?*}"
 
-PARAM="${NODE_URL#*\?}"
 
-PARAM="${PARAM%%#*}"
+
+QUERY=""
+
+if [[ "$NODE_URL" == *"?"* ]]; then
+
+    QUERY="${NODE_URL#*\?}"
+    QUERY="${QUERY%%#*}"
+
+fi
+
+
+
+get_param()
+{
+
+echo "$QUERY" \
+| tr '&' '\n' \
+| grep "^$1=" \
+| cut -d '=' -f2- \
+| head -1
+
+}
+
+
+
+SNI=$(get_param sni)
+
+
+if [ -z "$SNI" ]; then
+
+SNI="$SERVER"
+
+fi
 
 
 
@@ -140,51 +198,47 @@ echo "$PORT"
 
 
 
-SNI=$(echo "$NODE_URL" \
-| sed -n 's/.*sni=\([^&]*\).*/\1/p')
-
-
-if [ -z "$SNI" ]; then
-    SNI="$SERVER"
-fi
-
-
-
 echo
+
 echo "检测节点DNS..."
 
-NODE_IP=$(getent ahosts "$SERVER" \
-| awk '{print $1}' \
+NODE_IP=$(dig @1.1.1.1 +short "$SERVER" \
+| grep -E '^[0-9a-fA-F:.]+$' \
 | head -1 || true)
 
 
-if [ -n "$NODE_IP" ]; then
 
-echo "解析:"
-echo "$NODE_IP"
+if [ -z "$NODE_IP" ]; then
 
-else
+echo "节点DNS解析失败"
 
-echo "DNS解析失败"
 exit 1
 
 fi
 
 
 
-cat > "$INSTALL_DIR/node.env" <<EOF
+echo "解析:"
+echo "$NODE_IP"
+
+
+
+cat > "$ENV_FILE" <<EOF
 TYPE=$TYPE
 SERVER=$SERVER
 PORT=$PORT
 SNI=$SNI
+AUTH_HOST=$AUTH_HOST
 NODE_URL=$NODE_URL
 EOF
 
 
+
 echo
+
 echo "节点解析完成"
 
-source "$INSTALL_DIR/node.env"
+source "$ENV_FILE"
 
 
 cat > "$CONFIG" <<EOF
@@ -203,8 +257,7 @@ cat > "$CONFIG" <<EOF
         "type": "https",
         "tag": "dns-node",
         "server": "1.1.1.1",
-        "path": "/dns-query",
-        "detour": "direct"
+        "path": "/dns-query"
       },
 
 
@@ -260,6 +313,12 @@ cat > "$CONFIG" <<EOF
 
   "outbounds": [
 
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+
+
 EOF
 
 
@@ -270,7 +329,6 @@ if [ "$TYPE" = "anytls" ]; then
 cat >> "$CONFIG" <<EOF
 
     {
-
       "type": "anytls",
 
       "tag": "proxy",
@@ -279,7 +337,7 @@ cat >> "$CONFIG" <<EOF
 
       "server_port": $PORT,
 
-      "password": "${NODE_URL#*://}",
+      "password": "$AUTH_HOST",
 
 
       "tls": {
@@ -304,26 +362,24 @@ cat >> "$CONFIG" <<EOF
 
       "domain_resolver": "dns-node"
 
-    },
-
+    }
 
 EOF
+
 
 
 elif [ "$TYPE" = "tuic" ]; then
 
 
-UUID_PASS="${AUTH_HOST}"
+UUID="${AUTH_HOST%%:*}"
 
-UUID="${UUID_PASS%%:*}"
+PASSWORD="${AUTH_HOST#*:}"
 
-PASSWORD="${UUID_PASS#*:}"
 
 
 cat >> "$CONFIG" <<EOF
 
     {
-
       "type": "tuic",
 
       "tag": "proxy",
@@ -349,9 +405,7 @@ cat >> "$CONFIG" <<EOF
         "insecure": true,
 
         "alpn": [
-
           "h3"
-
         ]
 
       },
@@ -359,8 +413,7 @@ cat >> "$CONFIG" <<EOF
 
       "domain_resolver": "dns-node"
 
-    },
-
+    }
 
 EOF
 
@@ -371,55 +424,35 @@ fi
 
 cat >> "$CONFIG" <<EOF
 
-    {
-
-      "type": "direct",
-
-      "tag": "direct"
-
-    }
-
   ],
 
 
-
   "route": {
-
 
     "auto_detect_interface": true,
 
 
     "rules": [
 
-
       {
-
         "protocol": "dns",
-
         "action": "hijack-dns"
-
       },
 
 
       {
-
         "port": 22,
-
         "outbound": "direct"
-
       }
-
 
     ],
 
 
-    "final": "proxy",
+    "default_domain_resolver": "dns-node",
 
-
-    "default_domain_resolver": "dns-node"
+    "final": "proxy"
 
   }
-
 
 }
 
@@ -428,13 +461,17 @@ EOF
 
 
 echo
+
 echo "配置生成完成"
 
+
 echo
+
 echo "检查 sing-box 配置"
 
 
 $BIN check -c "$CONFIG"
+
 
 echo
 
@@ -451,22 +488,18 @@ Wants=network-online.target
 
 
 [Service]
-
 Type=simple
 
 ExecStart=$BIN run -c $CONFIG
 
 Restart=always
-
 RestartSec=5
 
 LimitNOFILE=1048576
 
 
 [Install]
-
 WantedBy=multi-user.target
-
 EOF
 
 
@@ -474,6 +507,7 @@ EOF
 systemctl daemon-reload
 
 systemctl enable sing-box >/dev/null 2>&1
+
 
 
 echo
@@ -501,29 +535,41 @@ if systemctl is-active --quiet sing-box; then
     echo "================================"
 
     echo
+
     echo "节点:"
-    echo "$TYPE://$SERVER:$PORT"
+    echo "$TYPE $SERVER:$PORT"
+
 
     echo
-    echo "DNS策略:"
-    echo "节点域名解析 -> 1.1.1.1 DoH"
 
-    echo "代理流量DNS -> 223.5.5.5"
+    echo "DNS:"
+    echo "节点解析 : 1.1.1.1 DoH"
 
-    echo
-    echo "SSH 22:"
-    echo "直连保护"
+    echo "代理DNS : 223.5.5.5"
+
 
     echo
-    echo "IPv4:"
-    echo "支持"
 
-    echo "IPv6:"
-    echo "支持"
+    echo "SSH:"
+    echo "22 端口直连保护"
+
 
     echo
-    echo "所有其它流量:"
-    echo "进入 TUN -> proxy"
+
+    echo "流量:"
+    echo "IPv4 全接管"
+
+    echo "IPv6 全接管"
+
+
+    echo
+
+    echo "日志:"
+    echo "Ctrl+C 退出日志，不停止服务"
+
+
+
+    journalctl -u sing-box -f
 
 
 
@@ -531,41 +577,28 @@ else
 
 
     echo
+
     echo "sing-box启动失败"
 
+
     echo
+
+    echo "日志:"
+
+
+    journalctl -u sing-box -n 80 --no-pager
+
+
+    echo
+
     echo "恢复网络"
 
 
+
     systemctl stop sing-box || true
-
-
-    ip rule del table 2022 2>/dev/null || true
-
-    ip route flush table 2022 2>/dev/null || true
-
-
-    echo
-
-    echo "失败日志:"
-
-    journalctl -u sing-box -n 50 --no-pager
 
 
     exit 1
 
 
 fi
-
-
-
-echo
-
-echo "实时日志"
-
-echo "Ctrl+C 只退出日志，不停止服务"
-
-echo
-
-
-journalctl -u sing-box -f
