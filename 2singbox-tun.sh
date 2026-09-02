@@ -3,7 +3,7 @@
 set -euo pipefail
 
 
-VERSION="1.1"
+VERSION="1.2"
 
 BASE="/root/singbox"
 
@@ -50,9 +50,9 @@ mkdir -p "${BASE}"
 
 if pgrep -f "${BIN}" >/dev/null; then
 
-    echo "检测到 sing-box 已运行"
+    echo "检测到 sing-box 正在运行"
 
-    read -rp "停止旧实例重新运行? [y/N]: " c
+    read -rp "停止旧实例? [y/N]: " c
 
 
     if [ "${c}" = "y" ]; then
@@ -95,24 +95,23 @@ if [ ! -x "${BIN}" ]; then
 
     case "${ARCH}" in
 
-
         x86_64)
 
-            A="amd64"
+            SB_ARCH="amd64"
 
             ;;
 
 
         aarch64|arm64|armv8l)
 
-            A="arm64"
+            SB_ARCH="arm64"
 
             ;;
 
 
         *)
 
-            echo "不支持架构: ${ARCH}"
+            echo "不支持架构 ${ARCH}"
 
             exit 1
 
@@ -124,7 +123,7 @@ if [ ! -x "${BIN}" ]; then
 
     TAG=$(curl -fsSL \
     https://api.github.com/repos/SagerNet/sing-box/releases/latest \
-    | jq -r .tag_name)
+    | jq -r '.tag_name')
 
 
 
@@ -133,12 +132,12 @@ if [ ! -x "${BIN}" ]; then
 
 
     curl -L \
-    "https://github.com/SagerNet/sing-box/releases/download/${TAG}/sing-box-${TAG#v}-linux-${A}.tar.gz" \
-    -o "${TMP}/sb.tar.gz"
+    "https://github.com/SagerNet/sing-box/releases/download/${TAG}/sing-box-${TAG#v}-linux-${SB_ARCH}.tar.gz" \
+    -o "${TMP}/singbox.tar.gz"
 
 
 
-    tar xf "${TMP}/sb.tar.gz" \
+    tar xf "${TMP}/singbox.tar.gz" \
     -C "${TMP}"
 
 
@@ -160,7 +159,7 @@ fi
 
 
 SSH_PORT=$(sshd -T 2>/dev/null \
-| awk '/^port/{print $2}' \
+| awk '/^port /{print $2}' \
 | head -1)
 
 
@@ -188,34 +187,30 @@ read -rp "请输入 anytls/tuic 节点URL: " NODE
 
 
 
+
 case "${NODE}" in
 
 
-    anytls://*)
+anytls://*)
 
-        TYPE="anytls"
-
-        ;;
+    ;;
 
 
-    tuic://*)
+tuic://*)
 
-        TYPE="tuic"
-
-        ;;
+    ;;
 
 
-    *)
+*)
 
-        echo "只支持 anytls:// 和 tuic://"
+    echo "只支持 anytls:// 和 tuic://"
 
-        exit 1
+    exit 1
 
-        ;;
+    ;;
 
 
 esac
-
 
 
 
@@ -244,10 +239,6 @@ u=urllib.parse.urlparse(url)
 q=urllib.parse.parse_qs(u.query)
 
 
-
-#########################
-# AnyTLS
-#########################
 
 if u.scheme=="anytls":
 
@@ -299,35 +290,26 @@ if u.scheme=="anytls":
 
 
 
-#########################
-# TUIC
-#########################
 
 elif u.scheme=="tuic":
 
 
     outbound={
 
-
         "type":"tuic",
 
         "tag":"proxy",
 
-
         "server":u.hostname,
-
 
         "server_port":u.port,
 
-
         "uuid":u.username,
-
 
         "password":u.password,
 
 
         "congestion_control":
-
             q.get("congestion_control",["bbr"])[0],
 
 
@@ -353,6 +335,7 @@ elif u.scheme=="tuic":
 
 
 
+
 else:
 
     raise Exception("unsupported")
@@ -374,6 +357,7 @@ config={
 
 "inbounds":[
 
+
 {
 
 "type":"tun",
@@ -382,15 +366,27 @@ config={
 
 "interface_name":"singtun",
 
-"inet4_address":"172.19.0.1/30",
+
+"address":[
+
+    "172.19.0.1/30"
+
+],
+
 
 "auto_route":True,
 
-"strict_route":True
+
+"strict_route":True,
+
+
+"stack":"system"
 
 }
 
+
 ],
+
 
 
 
@@ -425,7 +421,19 @@ outbound,
 
 {
 
-"port":ssh,
+"type":"logical",
+
+"mode":"or",
+
+"rules":[
+
+    {
+
+    "port":ssh
+
+    }
+
+],
 
 "outbound":"direct"
 
@@ -433,6 +441,7 @@ outbound,
 
 
 ],
+
 
 
 "final":"proxy"
@@ -443,7 +452,6 @@ outbound,
 
 
 }
-
 
 
 
@@ -459,14 +467,12 @@ PY
 
 
 
-
 echo
 
 echo "检查配置"
 
 
 "${BIN}" check -c "${CFG}"
-
 
 
 
@@ -507,40 +513,38 @@ IP=$(curl -4 \
 if [ -n "${IP}" ]; then
 
 
-    echo
+echo
 
-    echo "=============================="
+echo "=============================="
 
-    echo "启动成功"
+echo "启动成功"
 
-    echo "出口IP: ${IP}"
+echo "出口IP: ${IP}"
 
-    echo "PID: ${PID}"
+echo "PID: ${PID}"
 
-    echo "=============================="
+echo "=============================="
 
 
 
-    wait "${PID}"
+wait "${PID}"
 
 
 else
 
 
-    echo
+echo
 
-    echo "节点不可用，恢复网络"
-
-
-
-    kill "${PID}" 2>/dev/null || true
+echo "节点连接失败，恢复网络"
 
 
-    ip link delete singtun 2>/dev/null || true
+kill "${PID}" 2>/dev/null || true
 
 
+ip link delete singtun 2>/dev/null || true
 
-    exit 1
+
+exit 1
 
 
 fi
