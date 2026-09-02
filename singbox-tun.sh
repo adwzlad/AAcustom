@@ -2,46 +2,69 @@
 
 set -euo pipefail
 
-VERSION="1.0"
+
+VERSION="1.1"
 
 BASE="/root/singbox"
+
 BIN="${BASE}/sing-box"
+
 CFG="${BASE}/config.json"
+
 
 
 stop_box()
 {
     pkill -f "${BIN}" 2>/dev/null || true
+
     ip link delete singtun 2>/dev/null || true
+
     echo "sing-box stopped"
 }
 
 
+
 if [ "${1:-}" = "stop" ]; then
+
     stop_box
+
     exit 0
+
 fi
+
 
 
 if [ "$(id -u)" != "0" ]; then
+
     echo "请使用 root 运行"
+
     exit 1
+
 fi
 
 
+
 mkdir -p "${BASE}"
+
 
 
 if pgrep -f "${BIN}" >/dev/null; then
 
     echo "检测到 sing-box 已运行"
 
-    read -rp "停止旧实例? [y/N]: " c
+    read -rp "停止旧实例重新运行? [y/N]: " c
+
 
     if [ "${c}" = "y" ]; then
+
         stop_box
+
+        sleep 2
+
     else
+
         exit 0
+
     fi
 
 fi
@@ -49,6 +72,7 @@ fi
 
 
 apt update -y >/dev/null 2>&1
+
 
 apt install -y \
 curl \
@@ -59,7 +83,9 @@ iproute2 \
 
 
 
+
 if [ ! -x "${BIN}" ]; then
+
 
     echo "下载 sing-box"
 
@@ -69,20 +95,31 @@ if [ ! -x "${BIN}" ]; then
 
     case "${ARCH}" in
 
+
         x86_64)
-            A=amd64
+
+            A="amd64"
+
             ;;
 
-        aarch64|arm64)
-            A=arm64
+
+        aarch64|arm64|armv8l)
+
+            A="arm64"
+
             ;;
+
 
         *)
-            echo "不支持架构"
+
+            echo "不支持架构: ${ARCH}"
+
             exit 1
+
             ;;
 
     esac
+
 
 
     TAG=$(curl -fsSL \
@@ -94,21 +131,31 @@ if [ ! -x "${BIN}" ]; then
     TMP=$(mktemp -d)
 
 
+
     curl -L \
     "https://github.com/SagerNet/sing-box/releases/download/${TAG}/sing-box-${TAG#v}-linux-${A}.tar.gz" \
     -o "${TMP}/sb.tar.gz"
 
 
-    tar xf "${TMP}/sb.tar.gz" -C "${TMP}"
+
+    tar xf "${TMP}/sb.tar.gz" \
+    -C "${TMP}"
+
 
 
     cp "${TMP}"/sing-box-*/sing-box "${BIN}"
 
+
+
     chmod +x "${BIN}"
+
+
 
     rm -rf "${TMP}"
 
+
 fi
+
 
 
 
@@ -122,12 +169,19 @@ SSH_PORT=$(sshd -T 2>/dev/null \
 
 
 
+
 echo
+
 echo "================================"
-echo "Sing-box TUN ${VERSION}"
-echo "SSH保护端口: ${SSH_PORT}"
+
+echo " Sing-box TUN ${VERSION}"
+
+echo " SSH保护端口: ${SSH_PORT}"
+
 echo "================================"
+
 echo
+
 
 
 read -rp "请输入 anytls/tuic 节点URL: " NODE
@@ -136,27 +190,53 @@ read -rp "请输入 anytls/tuic 节点URL: " NODE
 
 case "${NODE}" in
 
-anytls://)
-    ;;
-tuic://)
-    ;;
-*)
-    echo "只支持 anytls:// 和 tuic://"
-    exit 1
-    ;;
+
+    anytls://*)
+
+        TYPE="anytls"
+
+        ;;
+
+
+    tuic://*)
+
+        TYPE="tuic"
+
+        ;;
+
+
+    *)
+
+        echo "只支持 anytls:// 和 tuic://"
+
+        exit 1
+
+        ;;
+
 
 esac
 
 
 
+
+
 python3 - "${NODE}" "${CFG}" "${SSH_PORT}" <<'PY'
 
-import sys,json,urllib.parse
+
+import sys
+
+import json
+
+import urllib.parse
+
 
 
 url=sys.argv[1]
+
 cfg=sys.argv[2]
+
 ssh=int(sys.argv[3])
+
 
 
 u=urllib.parse.urlparse(url)
@@ -165,63 +245,119 @@ q=urllib.parse.parse_qs(u.query)
 
 
 
+#########################
+# AnyTLS
+#########################
+
 if u.scheme=="anytls":
 
 
     outbound={
 
         "type":"anytls",
+
         "tag":"proxy",
+
         "server":u.hostname,
+
         "server_port":u.port,
+
         "password":urllib.parse.unquote(u.username),
 
+
         "tls":{
+
             "enabled":True
+
         }
 
     }
 
 
+
     if "sni" in q:
+
         outbound["tls"]["server_name"]=q["sni"][0]
 
 
+
     if "insecure" in q:
+
         outbound["tls"]["insecure"]=True
 
 
+
+    if "fp" in q:
+
+        outbound["tls"]["utls"]={
+
+            "enabled":True,
+
+            "fingerprint":q["fp"][0]
+
+        }
+
+
+
+#########################
+# TUIC
+#########################
 
 elif u.scheme=="tuic":
 
 
     outbound={
 
+
         "type":"tuic",
+
         "tag":"proxy",
 
+
         "server":u.hostname,
+
+
         "server_port":u.port,
 
+
         "uuid":u.username,
+
+
         "password":u.password,
 
+
         "congestion_control":
+
             q.get("congestion_control",["bbr"])[0],
 
+
         "tls":{
+
             "enabled":True
+
         }
 
     }
 
 
+
     if "sni" in q:
+
         outbound["tls"]["server_name"]=q["sni"][0]
 
 
+
     if "alpn" in q:
+
         outbound["tls"]["alpn"]=q["alpn"][0].split(",")
+
+
+
+else:
+
+    raise Exception("unsupported")
+
+
 
 
 
@@ -229,8 +365,11 @@ config={
 
 
 "log":{
+
     "level":"error"
+
 },
+
 
 
 "inbounds":[
@@ -257,14 +396,21 @@ config={
 
 "outbounds":[
 
+
 outbound,
 
+
 {
+
 "type":"direct",
+
 "tag":"direct"
+
 }
 
+
 ],
+
 
 
 
@@ -276,6 +422,7 @@ outbound,
 
 "rules":[
 
+
 {
 
 "port":ssh,
@@ -283,6 +430,7 @@ outbound,
 "outbound":"direct"
 
 }
+
 
 ],
 
@@ -292,24 +440,39 @@ outbound,
 
 }
 
+
+
 }
 
 
+
+
+
 with open(cfg,"w") as f:
+
     json.dump(config,f,indent=2)
+
+
 
 PY
 
 
 
+
+
 echo
+
 echo "检查配置"
+
 
 "${BIN}" check -c "${CFG}"
 
 
 
+
+
 echo
+
 echo "启动 TUN"
 
 
@@ -327,7 +490,9 @@ sleep 8
 
 
 
+
 echo
+
 echo "检测节点"
 
 
@@ -338,37 +503,44 @@ IP=$(curl -4 \
 
 
 
+
 if [ -n "${IP}" ]; then
 
 
-echo
-echo "============================"
-echo "启动成功"
-echo "出口IP:"
-echo "${IP}"
-echo "PID:"
-echo "${PID}"
-echo "============================"
+    echo
+
+    echo "=============================="
+
+    echo "启动成功"
+
+    echo "出口IP: ${IP}"
+
+    echo "PID: ${PID}"
+
+    echo "=============================="
 
 
 
-wait "${PID}"
+    wait "${PID}"
 
 
 else
 
 
-echo
-echo "节点不可用，恢复网络"
+    echo
+
+    echo "节点不可用，恢复网络"
 
 
-kill "${PID}" 2>/dev/null || true
+
+    kill "${PID}" 2>/dev/null || true
 
 
-ip link delete singtun 2>/dev/null || true
+    ip link delete singtun 2>/dev/null || true
 
 
-exit 1
+
+    exit 1
 
 
 fi
