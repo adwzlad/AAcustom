@@ -1,7 +1,3 @@
-Debian/Ubuntu临时singbox tun节点，22端口不接管流量。其它流量全接管。
-
-bash <(curl -sL https://raw.githubusercontent.com/adwzlad/AAcustom/main/singbox-tun.sh)
-
 S-UI面板  路由列表  使用，要先设置S-UI面板>节点管理  创建  warp  节点
 
 https://raw.githubusercontent.com/adwzlad/AAcustom/main/S-UI/s-ui.json
