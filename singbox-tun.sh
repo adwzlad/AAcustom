@@ -1,702 +1,451 @@
-#!/usr/bin/env bash
-# ==========================================================
-# Sing-box TUN OneKey 2.0
-#
-# Support:
-#   Ubuntu 22.04 / 24.04
-#   Debian 12 / 13
-#
-# Protocol:
-#   anytls://
-#   tuic://
-#
-# Features:
-#   - latest sing-box release auto download
-#   - amd64 / arm64
-#   - IPv4 / IPv6 node
-#   - IPv6-only domain
-#   - node DNS resolver: 1.1.1.1
-#   - client DNS through proxy: 223.5.5.5
-#   - SSH port bypass
-#   - temporary mode
-#
-# ==========================================================
+#!/bin/bash
+set -e
 
-set -euo pipefail
-
-VERSION="2.0"
+VERSION="2.1"
 
 BASE_DIR="/root/singbox"
 BIN="$BASE_DIR/sing-box"
 CONFIG="$BASE_DIR/config.json"
 
-SSH_PORT=22
-
 mkdir -p "$BASE_DIR"
 
-
-echo
 echo "================================"
 echo " Sing-box TUN $VERSION"
-echo " Latest Core"
-echo " Node DNS     : 1.1.1.1"
-echo " Client DNS   : 223.5.5.5"
-echo " SSH bypass   : $SSH_PORT"
-echo " Temporary    : ON"
+echo " sing-box latest"
+echo " Node DNS : 1.1.1.1"
+echo " Client DNS : 223.5.5.5"
+echo " SSH bypass : 22"
+echo " Temporary mode"
 echo "================================"
-echo
 
-
-# ----------------------------------------------------------
-# root check
-# ----------------------------------------------------------
 
 if [ "$(id -u)" != "0" ]; then
-    echo "必须使用 root 运行"
+    echo "请使用root运行"
     exit 1
 fi
 
 
-# ----------------------------------------------------------
-# check existing sing-box
-# ----------------------------------------------------------
-
-if pgrep -x sing-box >/dev/null 2>&1; then
-    echo
-    echo "检测到 sing-box 已运行"
-    echo
-
-    ps aux | grep sing-box | grep -v grep
-
-    echo
-    echo "请先停止已有实例"
+if pgrep -x sing-box >/dev/null; then
+    echo "已有sing-box运行"
     exit 1
 fi
 
 
-# ----------------------------------------------------------
-# install dependency
-# ----------------------------------------------------------
-
-install_pkg()
+apt_update()
 {
-    export DEBIAN_FRONTEND=noninteractive
-
     apt update -qq
-
-    apt install -y -qq \
-        curl \
-        wget \
-        unzip \
-        ca-certificates \
-        jq \
-        dnsutils \
-        iproute2 \
-        procps >/dev/null
+    apt install -y \
+    curl wget unzip jq dnsutils iproute2 procps >/dev/null
 }
 
 
-for p in curl wget unzip jq dig ip
+for i in curl wget jq dig
 do
-    if ! command -v "$p" >/dev/null 2>&1
-    then
-        install_pkg
-        break
-    fi
+    command -v $i >/dev/null 2>&1 || apt_update
 done
 
-
-# ----------------------------------------------------------
-# detect architecture
-# ----------------------------------------------------------
 
 ARCH=$(uname -m)
 
 case "$ARCH" in
-
 x86_64)
     SB_ARCH="amd64"
     ;;
-
 aarch64|arm64)
     SB_ARCH="arm64"
     ;;
-
 *)
-    echo "不支持架构:"
-    echo "$ARCH"
+    echo "不支持架构 $ARCH"
     exit 1
     ;;
-
 esac
 
 
-echo
-echo "系统架构:"
-echo "$ARCH"
-echo
 
+if [ ! -x "$BIN" ]; then
 
-# ----------------------------------------------------------
-# download latest sing-box
-# ----------------------------------------------------------
+    echo "下载最新版sing-box"
 
-download_singbox()
-{
-
-    echo "获取 sing-box 最新稳定版..."
-
-
-    TAG=$(curl -fsSL \
+    TAG=$(curl -s \
     https://api.github.com/repos/SagerNet/sing-box/releases/latest \
-    | jq -r '.tag_name')
-
-
-    if [ -z "$TAG" ] || [ "$TAG" = "null" ]
-    then
-        echo "无法获取最新版"
-        exit 1
-    fi
-
-
-    echo "版本:"
-    echo "$TAG"
+    | jq -r .tag_name)
 
 
     FILE="sing-box-${TAG#v}-linux-${SB_ARCH}.tar.gz"
 
 
-    URL="https://github.com/SagerNet/sing-box/releases/download/${TAG}/${FILE}"
+    wget -q \
+    "https://github.com/SagerNet/sing-box/releases/download/$TAG/$FILE" \
+    -O /tmp/$FILE
 
 
-    TMP="/tmp/$FILE"
+    tar xf /tmp/$FILE -C /tmp
 
 
-    echo "下载:"
-    echo "$URL"
-
-
-    wget -q --show-progress \
-        "$URL" \
-        -O "$TMP"
-
-
-
-    rm -rf /tmp/sing-box-*
-
-
-    tar xf "$TMP" -C /tmp
-
-
-    DIR=$(find /tmp \
-        -maxdepth 1 \
-        -type d \
-        -name "sing-box-*" \
-        | head -n1)
+    DIR=$(find /tmp -maxdepth 1 -type d \
+    -name "sing-box-*" | head -1)
 
 
     cp "$DIR/sing-box" "$BIN"
 
-
     chmod +x "$BIN"
 
-
-}
-
-
-if [ ! -x "$BIN" ]
-then
-    download_singbox
-else
-    echo
-    echo "发现已有 sing-box:"
-    "$BIN" version
-    echo
 fi
 
 
-# ----------------------------------------------------------
-# input node URL
-# ----------------------------------------------------------
+$BIN version
+
+
 
 echo
-echo "请输入 anytls/tuic 节点URL:"
-echo
-
-read -r NODE_URL
+read -rp "请输入 anytls/tuic 节点URL: " NODE_URL
 
 
-if [[ "$NODE_URL" != anytls://* ]] &&
-   [[ "$NODE_URL" != tuic://* ]]
-then
-
-    echo
-    echo "只支持:"
-    echo "anytls://"
-    echo "tuic://"
+case "$NODE_URL" in
+anytls://*)
+    TYPE="anytls"
+    ;;
+tuic://*)
+    TYPE="tuic"
+    ;;
+*)
+    echo "只支持anytls/tuic"
     exit 1
-
-fi
-
-
-echo
-echo "解析节点..."
-
-# ----------------------------------------------------------
-# parse node url
-# ----------------------------------------------------------
-
-NODE_TYPE=""
-SERVER=""
-SERVER_PORT=""
-USER=""
-PASS=""
-
-if [[ "$NODE_URL" == anytls://* ]]
-then
-    NODE_TYPE="anytls"
-
-    TMP_URL="${NODE_URL#anytls://}"
-
-    # remove fragment
-    TMP_URL="${TMP_URL%%#*}"
-
-    # get server part
-    AUTH_HOST="${TMP_URL%%\?*}"
-
-    USER="${AUTH_HOST%@*}"
-
-    HOST_PORT="${AUTH_HOST##*@}"
+    ;;
+esac
 
 
-elif [[ "$NODE_URL" == tuic://* ]]
-then
-    NODE_TYPE="tuic"
 
-    TMP_URL="${NODE_URL#tuic://}"
+RAW="${NODE_URL#*://}"
 
-    TMP_URL="${TMP_URL%%#*}"
+RAW="${RAW%%#*}"
 
-    AUTH_HOST="${TMP_URL%%\?*}"
-
-    USER="${AUTH_HOST%@*}"
-
-    HOST_PORT="${AUTH_HOST##*@}"
-
-
-fi
-
-
-# ----------------------------------------------------------
-# IPv4 / IPv6 / domain split
-# ----------------------------------------------------------
-
-if [[ "$HOST_PORT" =~ ^\[.*\]:[0-9]+$ ]]
-then
-
-    # IPv6 address
-
-    SERVER="${HOST_PORT%%]*}"
-    SERVER="${SERVER#\[}"
-
-    SERVER_PORT="${HOST_PORT##*:}"
-
-    SERVER_IS_IP6=1
-
-
-elif [[ "$HOST_PORT" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]]
-then
-
-    SERVER="${HOST_PORT%:*}"
-    SERVER_PORT="${HOST_PORT##*:}"
-
-    SERVER_IS_IP6=0
-
-
-else
-
-    SERVER="${HOST_PORT%:*}"
-    SERVER_PORT="${HOST_PORT##*:}"
-
-    SERVER_IS_IP6=0
-
-fi
-
-
-echo
-echo "节点类型:"
-echo "$NODE_TYPE"
-
-echo "服务器:"
-echo "$SERVER"
-
-echo "端口:"
-echo "$SERVER_PORT"
-
-
-# ----------------------------------------------------------
-# verify domain by 1.1.1.1
-# ----------------------------------------------------------
-
-if [ "$SERVER_IS_IP6" = "0" ] &&
-   ! [[ "$SERVER" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
-then
-
-    echo
-    echo "检测节点DNS..."
-
-    A_RECORD=$(dig @1.1.1.1 "$SERVER" A +short | head -n1 || true)
-
-    AAAA_RECORD=$(dig @1.1.1.1 "$SERVER" AAAA +short | head -n1 || true)
-
-
-    if [ -n "$A_RECORD" ]
-    then
-        echo "IPv4:"
-        echo "$A_RECORD"
-    fi
-
-
-    if [ -n "$AAAA_RECORD" ]
-    then
-        echo "IPv6:"
-        echo "$AAAA_RECORD"
-    fi
-
-
-    if [ -z "$A_RECORD" ] &&
-       [ -z "$AAAA_RECORD" ]
-    then
-        echo
-        echo "节点域名无法解析"
-        exit 1
-    fi
-
-fi
-
-
-# ----------------------------------------------------------
-# extract query parameters
-# ----------------------------------------------------------
+MAIN="${RAW%%\?*}"
 
 QUERY=""
 
-if [[ "$NODE_URL" == *"?"* ]]
-then
-    QUERY="${NODE_URL#*\?}"
-    QUERY="${QUERY%%#*}"
+if [[ "$RAW" == *"?"* ]]; then
+    QUERY="${RAW#*\?}"
 fi
+
+
+USERINFO="${MAIN%@*}"
+HOSTPORT="${MAIN##*@}"
+
+
+
+if [[ "$HOSTPORT" =~ ^\[.*\]:[0-9]+$ ]]; then
+
+    SERVER="${HOSTPORT%%]*}"
+    SERVER="${SERVER#\[}"
+
+    PORT="${HOSTPORT##*:}"
+
+
+else
+
+    SERVER="${HOSTPORT%:*}"
+    PORT="${HOSTPORT##*:}"
+
+fi
+
+
+
+echo
+echo "类型: $TYPE"
+echo "服务器: $SERVER"
+echo "端口: $PORT"
+
 
 
 get_param()
 {
-    echo "$QUERY" \
-    | tr '&' '\n' \
-    | grep "^$1=" \
-    | cut -d '=' -f2- \
-    | head -n1
+echo "$QUERY" | tr '&' '\n' \
+| grep "^$1=" \
+| cut -d '=' -f2- \
+| head -1
 }
 
 
-TLS_INSECURE=$(get_param insecure || true)
+SNI=$(get_param sni)
 
-SNI=$(get_param sni || true)
+INSECURE=$(get_param insecure)
 
-ALPN=$(get_param alpn || true)
+ALPN=$(get_param alpn)
 
-CONGESTION=$(get_param congestion_control || true)
+CONGESTION=$(get_param congestion_control)
 
 
-# ----------------------------------------------------------
-# generate outbound
-# ----------------------------------------------------------
 
-if [ "$NODE_TYPE" = "anytls" ]
-then
+echo "解析节点完成"
 
-cat > "$BASE_DIR/outbound.json" <<EOF
+cat > "$CONFIG" <<EOF
 {
-"type":"anytls",
-"tag":"proxy",
-"server":"$SERVER",
-"server_port":$SERVER_PORT,
-"password":"$USER",
-"tls":{
-  "enabled":true,
-  "server_name":"${SNI:-$SERVER}",
-  "insecure":$([ "$TLS_INSECURE" = "1" ] && echo true || echo false),
-  "utls":{
-     "enabled":true,
-     "fingerprint":"chrome"
-  }
-},
-"domain_resolver":"dns-node"
-}
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+
+  "dns": {
+    "servers": [
+      {
+        "tag": "dns-node",
+        "address": "https://1.1.1.1/dns-query",
+        "detour": "direct"
+      },
+      {
+        "tag": "dns-proxy",
+        "address": "udp://223.5.5.5",
+        "detour": "proxy"
+      }
+    ],
+    "rules": [
+      {
+        "server": "dns-node",
+        "domain_suffix": [
+          "$SERVER"
+        ]
+      },
+      {
+        "server": "dns-proxy",
+        "rule_set": []
+      }
+    ],
+    "final": "dns-proxy"
+  },
+
+
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "interface_name": "singtun",
+      "inet4_address": "172.19.0.1/30",
+      "inet6_address": "fdfe:dcba:9876::1/126",
+      "auto_route": true,
+      "strict_route": true,
+      "stack": "system"
+    }
+  ],
+
+
+  "outbounds": [
+
 EOF
 
 
-elif [ "$NODE_TYPE" = "tuic" ]
-then
+
+if [ "$TYPE" = "anytls" ]; then
 
 
-UUID="${USER%%:*}"
-PASSWORD="${USER#*:}"
+UUID=$(echo "$USERINFO" | cut -d: -f1)
+PASS=$(echo "$USERINFO" | cut -d: -f2)
 
 
-cat > "$BASE_DIR/outbound.json" <<EOF
-{
-"type":"tuic",
-"tag":"proxy",
-"server":"$SERVER",
-"server_port":$SERVER_PORT,
-"uuid":"$UUID",
-"password":"$PASSWORD",
-"congestion_control":"${CONGESTION:-bbr}",
-"tls":{
- "enabled":true,
- "server_name":"${SNI:-$SERVER}",
- "insecure":$([ "$TLS_INSECURE" = "1" ] && echo true || echo false),
- "alpn":[
-   "h3"
- ]
-},
-"domain_resolver":"dns-node"
-}
+cat >> "$CONFIG" <<EOF
+    {
+      "type": "anytls",
+      "tag": "proxy",
+      "server": "$SERVER",
+      "server_port": $PORT,
+      "password": "$USERINFO",
+
+      "tls": {
+        "enabled": true,
+        "server_name": "$SNI",
+        "insecure": true,
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        }
+      },
+
+      "domain_resolver": "dns-node"
+    },
+
+EOF
+
+
+
+else
+
+
+UUID=$(echo "$USERINFO" | cut -d: -f1)
+PASS=$(echo "$USERINFO" | cut -d: -f2)
+
+
+cat >> "$CONFIG" <<EOF
+    {
+      "type": "tuic",
+      "tag": "proxy",
+
+      "server": "$SERVER",
+      "server_port": $PORT,
+
+      "uuid": "$UUID",
+      "password": "$PASS",
+
+      "congestion_control": "${CONGESTION:-bbr}",
+
+      "tls": {
+        "enabled": true,
+        "server_name": "$SNI",
+        "insecure": true,
+        "alpn": [
+          "h3"
+        ]
+      },
+
+      "domain_resolver": "dns-node"
+    },
+
 EOF
 
 
 fi
 
 
-echo
-echo "生成 outbound 完成"
 
-# ----------------------------------------------------------
-# generate sing-box config
-# ----------------------------------------------------------
+cat >> "$CONFIG" <<EOF
 
-OUTBOUND=$(cat "$BASE_DIR/outbound.json")
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
 
-
-cat > "$CONFIG" <<EOF
-{
-"log":{
- "level":"error"
-},
-
-"dns":{
- "servers":[
-  {
-   "tag":"dns-node",
-   "address":"https://1.1.1.1/dns-query",
-   "detour":"direct"
-  },
-  {
-   "tag":"dns-proxy",
-   "address":"https://223.5.5.5/dns-query",
-   "detour":"proxy"
-  }
- ],
-
- "rules":[
-  {
-   "domain_suffix":[
-    "$SERVER"
-   ],
-   "server":"dns-node"
-  }
- ],
-
- "final":"dns-proxy"
-},
-
-
-"inbounds":[
- {
-  "type":"tun",
-  "tag":"tun-in",
-  "interface_name":"singtun",
-  "address":[
-    "172.19.0.1/30",
-    "fd00::1/126"
   ],
-  "auto_route":true,
-  "strict_route":true,
-  "stack":"mixed",
-  "sniff":true
- }
-],
 
 
-"outbounds":[
- $OUTBOUND
- ,
+  "route": {
 
- {
-  "type":"direct",
-  "tag":"direct"
- },
+    "auto_detect_interface": true,
 
- {
-  "type":"block",
-  "tag":"block"
- }
-],
+    "rules": [
+
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
 
 
-"route":{
+      {
+        "port": 22,
+        "outbound": "direct"
+      }
 
- "auto_detect_interface":true,
+    ],
 
- "default_domain_resolver":"dns-node",
+    "final": "proxy",
 
- "rules":[
-
-  {
-   "protocol":"dns",
-   "outbound":"proxy"
-  },
-
-
-  {
-   "port":$SSH_PORT,
-   "outbound":"direct"
-  },
-
-
-  {
-   "ip_is_private":true,
-   "outbound":"direct"
+    "default_domain_resolver": "dns-node"
   }
 
- ],
-
- "final":"proxy"
 }
 
-}
 EOF
+
 
 
 echo
 echo "配置生成完成"
+
 echo
-
-
-# ----------------------------------------------------------
-# check config
-# ----------------------------------------------------------
-
 echo "检查 sing-box 配置"
 
-if ! "$BIN" check -c "$CONFIG"
-then
-
-    echo
-    echo "配置错误"
-    exit 1
-
-fi
-
+$BIN check -c "$CONFIG"
 
 echo
 echo "配置正常"
+
+
 echo
-
-
-# ----------------------------------------------------------
-# start sing-box
-# ----------------------------------------------------------
-
 echo "启动 TUN..."
 
-"$BIN" run -c "$CONFIG" \
-    >/dev/null 2>&1 &
+mkdir -p /etc/systemd/system
+
+cat > /etc/systemd/system/sing-box.service <<EOF
+[Unit]
+Description=sing-box TUN Proxy
+After=network-online.target
+Wants=network-online.target
 
 
-SB_PID=$!
+[Service]
+Type=simple
+
+ExecStart=$BIN run -c $CONFIG
+
+Restart=always
+RestartSec=5
+
+LimitNOFILE=1048576
+
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+
+
+systemctl daemon-reload
+
+systemctl enable sing-box >/dev/null 2>&1
+
+systemctl restart sing-box
+
 
 
 sleep 5
 
 
-if ! kill -0 "$SB_PID" >/dev/null 2>&1
-then
-
-    echo
-    echo "sing-box启动失败"
-    exit 1
-
-fi
-
-
-# ----------------------------------------------------------
-# connectivity test
-# ----------------------------------------------------------
 
 echo
-echo "检测节点连通性..."
+echo "检查运行状态"
 
-TEST_OK=0
-
-
-for i in 1 2 3
-do
-
-    if curl \
-       --connect-timeout 5 \
-       --max-time 8 \
-       -I https://www.cloudflare.com \
-       >/dev/null 2>&1
-
-    then
-
-        TEST_OK=1
-        break
-
-    fi
-
-
-    sleep 2
-
-done
-
-
-
-if [ "$TEST_OK" = "1" ]
-then
+if systemctl is-active --quiet sing-box; then
 
     echo
     echo "================================"
-    echo " 节点连接成功"
-    echo " sing-box运行中"
-    echo
-    echo "PID:"
-    echo "$SB_PID"
-    echo
-    echo "配置:"
-    echo "$CONFIG"
+    echo " sing-box TUN 启动成功"
     echo "================================"
-
+    echo
+    echo "节点:"
+    echo "$SERVER:$PORT"
+    echo
+    echo "SSH端口 22 已直连保护"
+    echo "其它IPv4/IPv6流量全部接管"
+    echo
+    echo "DNS:"
+    echo "节点解析 -> 1.1.1.1"
+    echo "代理DNS -> 223.5.5.5"
+    echo
 
 else
 
-
     echo
-    echo "节点连接失败"
+    echo "启动失败"
+    echo
     echo "恢复网络..."
 
+    systemctl stop sing-box
 
-    kill "$SB_PID" >/dev/null 2>&1 || true
+    ip rule del table 2022 2>/dev/null || true
+    ip route flush table 2022 2>/dev/null || true
 
-
-    ip link delete singtun \
-        >/dev/null 2>&1 || true
-
+    echo
+    echo "请检查:"
+    echo "$CONFIG"
+    echo
 
     exit 1
 
 fi
 
 
-wait "$SB_PID"
+
+echo
+echo "实时日志:"
+echo "Ctrl+C退出日志，不停止服务"
+
+journalctl -u sing-box -f
